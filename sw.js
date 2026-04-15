@@ -1,17 +1,44 @@
-// Gossip! Bookings — Service Worker
-const CACHE_NAME = 'gossip-bookings-v2';
-const BASE = '/gossipbookings/';
-const ASSETS = [BASE, BASE + 'index.html', BASE + 'manifest.json', BASE + 'icon-192.png'];
+// Gossip! Bookings — Service Worker v3
+// Handles Firebase Cloud Messaging background notifications
 
-// Install
+importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
+
+const CACHE_NAME = 'gossip-bookings-v3';
+const BASE = '/gossipbookings/';
+
+// ── Firebase config (same as index.html) ──────────────────
+firebase.initializeApp({
+  apiKey:            "AIzaSyAITydT4tYzjOyP3m995_WHh188omR8drU",
+  authDomain:        "gossipbookings.firebaseapp.com",
+  projectId:         "gossipbookings",
+  storageBucket:     "gossipbookings.firebasestorage.app",
+  messagingSenderId: "612011316352",
+  appId:             "1:612011316352:web:50cf6f27fc36101a5f8265"
+});
+
+const fcmMessaging = firebase.messaging();
+
+// ── Handle background FCM messages ────────────────────────
+fcmMessaging.onBackgroundMessage((payload) => {
+  const { title, body } = payload.notification || {};
+  self.registration.showNotification(title || 'Gossip! Bookings', {
+    body: body || '',
+    icon: BASE + 'icon-192.png',
+    badge: BASE + 'icon-192.png',
+    tag: payload.data?.bookingId || 'gossip-notif',
+    requireInteraction: true,
+    vibrate: [200, 100, 200],
+    data: { url: 'https://tarunjain26.github.io/gossipbookings/' }
+  });
+});
+
+// ── Install ────────────────────────────────────────────────
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS).catch(() => {}))
-  );
   self.skipWaiting();
 });
 
-// Activate
+// ── Activate ───────────────────────────────────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -21,48 +48,16 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
-// Fetch — serve from cache when offline
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request))
-  );
-});
-
-// Notification click — open app
+// ── Notification click: open app ───────────────────────────
 self.addEventListener('notificationclick', event => {
   event.notification.close();
+  const url = event.notification.data?.url || BASE;
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
       for (const client of clientList) {
         if ('focus' in client) return client.focus();
       }
-      if (clients.openWindow) return clients.openWindow(BASE);
+      if (clients.openWindow) return clients.openWindow(url);
     })
   );
-});
-
-// Message from app — schedule or cancel notification
-self.addEventListener('message', event => {
-  if (!event.data) return;
-
-  if (event.data.type === 'SCHEDULE_NOTIFICATION') {
-    const { booking, delay } = event.data;
-    setTimeout(() => {
-      self.registration.showNotification('Upcoming booking — Gossip! 🔔', {
-        body: `${booking.name}  ·  ${booking.type}  ·  ${booking.fromTime}  ·  ${booking.guests} guests`,
-        icon: BASE + 'icon-192.png',
-        badge: BASE + 'icon-192.png',
-        tag: `booking-${booking.id}`,
-        renotify: false,
-        requireInteraction: true,
-        vibrate: [200, 100, 200],
-        data: { bookingId: booking.id }
-      });
-    }, delay);
-  }
-
-  if (event.data.type === 'CANCEL_NOTIFICATION') {
-    self.registration.getNotifications({ tag: `booking-${event.data.bookingId}` })
-      .then(notifications => notifications.forEach(n => n.close()));
-  }
 });
