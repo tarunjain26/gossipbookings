@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gossip! Bookings</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5; color: #1a1a1a; min-height: 100vh; font-size: 14px; line-height: 1.5;
+    }
+    :root {
+      --coral: #F05A35; --coral-dark: #d94a27; --coral-light: #FEE8E2;
+      --coral-pale: #FEF5F2; --coral-mid: #F9B49E; --black: #1a1a1a;
+      --header-bg: #1a1a1a; --white: #ffffff; --gray-50: #fafafa;
+      --gray-100: #f5f5f5; --gray-200: #ebebeb; --gray-300: #e0e0e0;
+      --gray-400: #bbb; --gray-500: #aaa; --gray-600: #888;
+      --gray-700: #555; --gray-800: #333; --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px;
+    }
+    input, select, textarea, button { font-family: inherit; font-size: 14px; }
+    input, select, textarea {
+      border: 1px solid var(--gray-300); border-radius: var(--radius-md);
+      padding: 8px 10px; background: var(--white); color: var(--black);
+      width: 100%; transition: border-color .15s, box-shadow .15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: var(--coral); box-shadow: 0 0 0 3px rgba(240,90,53,.12);
+    }
+    input::placeholder, textarea::placeholder { color: var(--gray-400); }
+    input:disabled, select:disabled, textarea:disabled {
+      background: var(--gray-100); color: var(--gray-700); cursor: not-allowed;
+    }
+    button {
+      cursor: pointer; border: none; border-radius: var(--radius-md);
+      padding: 7px 16px; font-weight: 500; transition: background .15s, transform .1s, opacity .15s;
+    }
+    button:active { transform: scale(.97); }
+    .btn-coral { background: var(--coral); color: #fff; }
+    .btn-coral:hover { background: var(--coral-dark); }
+    .btn-coral:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+    .btn-ghost { background: var(--gray-100); color: var(--gray-700); border: 1px solid var(--gray-300); }
+    .btn-ghost:hover { background: var(--gray-200); color: var(--black); }
+    .btn-edit { background: var(--gray-100); color: var(--gray-700); border: 1px solid var(--gray-200); font-size: 12px; padding: 4px 12px; }
+    .btn-edit:hover { background: var(--gray-200); color: var(--black); }
+    .btn-del { background: var(--coral-light); color: #C03A1A; border: 1px solid var(--coral-mid); font-size: 12px; padding: 4px 12px; }
+    .btn-del:hover { background: #fdd5c8; }
+    .btn-nav { background: var(--coral-light); color: #C03A1A; border: 1px solid var(--coral-mid); padding: 6px 14px; font-size: 18px; line-height: 1; border-radius: var(--radius-md); }
+    .btn-nav:hover { background: var(--coral-mid); }
+    .btn-close { background: var(--gray-100); color: var(--gray-600); border: 1px solid var(--gray-200); padding: 3px 9px; font-size: 15px; }
+    .btn-close:hover { background: var(--gray-200); }
+    .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--gray-100); padding: 1rem; }
+    .login-card { background: var(--white); border-radius: var(--radius-lg); border: 1px solid var(--gray-200); padding: 2rem; width: 380px; max-width: 100%; }
+    .login-title { font-size: 16px; font-weight: 600; color: var(--gray-700); margin-bottom: 1.25rem; }
+    .error-msg { background: var(--coral-light); color: #C03A1A; border: 1px solid var(--coral-mid); border-radius: var(--radius-md); padding: 8px 12px; font-size: 13px; margin-bottom: 12px; }
+    .brand-header { background: var(--header-bg); border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 1.5rem; text-align: center; }
+    .brand-name { font-size: 32px; font-weight: 900; color: var(--coral); text-transform: uppercase; letter-spacing: -.01em; line-height: 1; }
+    .brand-sub { font-size: 9px; color: #888; letter-spacing: .18em; text-transform: uppercase; margin-top: 3px; }
+    .app-header { background: var(--header-bg); position: sticky; top: 0; z-index: 50; }
+    .header-inner { max-width: 1100px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 14px; }
+    .brand-lockup .brand-name { font-size: 22px; }
+    .brand-lockup .brand-sub { margin-top: 1px; }
+    .header-divider { width: 1px; height: 34px; background: #333; }
+    .header-label { font-size: 13px; color: #ccc; font-weight: 500; letter-spacing: .03em; }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .role-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; background: var(--coral); color: #fff; letter-spacing: .04em; text-transform: uppercase; }
+    .user-email { font-size: 12px; color: #888; }
+    .app-main { max-width: 1100px; margin: 0 auto; padding: 1.5rem 20px 3rem; }
+    .action-bar { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--gray-200); margin-bottom: 1.25rem; flex-wrap: wrap; gap: 8px; }
+    .tabs { display: flex; }
+    .tab-btn { padding: 9px 18px; font-size: 13px; border: none; background: transparent; color: var(--gray-500); cursor: pointer; border-bottom: 3px solid transparent; font-weight: 500; border-radius: 0; transition: color .15s; }
+    .tab-btn.active { color: var(--coral); border-bottom-color: var(--coral); }
+    .tab-btn:hover:not(.active) { color: var(--black); }
+    .action-right { display: flex; align-items: center; gap: 8px; padding-bottom: 6px; }
+    .action-right select { width: auto; }
+    .cal-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .month-label { font-size: 17px; font-weight: 600; min-width: 160px; text-align: center; color: var(--black); }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .cal-header-cell { font-size: 11px; color: #fff; text-align: center; padding: 6px 0; font-weight: 700; background: var(--coral); border-radius: 4px; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 2px; }
+    .cal-day { min-height: 82px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm); padding: 5px; cursor: pointer; background: var(--white); transition: border-color .15s, background .15s; }
+    .cal-day:hover { border-color: var(--coral); background: var(--coral-pale); }
+    .cal-day.other-month { background: var(--gray-50); opacity: .45; pointer-events: none; }
+    .cal-day.today { border: 2px solid var(--coral); }
+    .cal-day.selected { background: var(--coral-pale); border-color: var(--coral); }
+    .day-num { font-size: 11px; color: var(--gray-500); font-weight: 500; margin-bottom: 3px; }
+    .cal-day.today .day-num { color: var(--coral); font-weight: 700; }
+    .cal-event { font-size: 10px; padding: 2px 5px; border-radius: 3px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; font-weight: 600; }
+    .ev-table { background: var(--coral-light); color: #C03A1A; border-left: 2px solid var(--coral); }
+    .ev-private { background: #f0f0f0; color: #555; border-left: 2px solid #aaa; }
+    .cal-more { font-size: 9px; color: var(--gray-400); margin-top: 1px; }
+    .cal-legend { display: flex; gap: 16px; margin-top: 12px; }
+    .legend-item { font-size: 12px; color: var(--gray-600); display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+    .dot-table { background: var(--coral); }
+    .dot-private { background: #ccc; }
+    .list-container { border: 1px solid var(--gray-200); border-radius: var(--radius-lg); background: var(--white); overflow: hidden; }
+    .list-row { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--gray-100); transition: background .1s; }
+    .list-row:last-child { border-bottom: none; }
+    .list-row:hover { background: var(--gray-50); }
+    .list-info { flex: 1; min-width: 0; }
+    .list-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .list-meta { font-size: 12px; color: var(--gray-600); margin-top: 2px; }
+    .list-extra { font-size: 11px; color: var(--gray-400); margin-top: 1px; }
+    .list-empty { text-align: center; padding: 3rem; color: var(--gray-400); font-size: 14px; }
+    .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; white-space: nowrap; letter-spacing: .02em; }
+    .badge-table { background: var(--coral-light); color: #C03A1A; border: 1px solid var(--coral-mid); }
+    .badge-private { background: #f0f0f0; color: #555; border: 1px solid #ddd; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: flex-start; justify-content: center; z-index: 200; padding: 2rem 1rem; overflow-y: auto; }
+    .modal { background: var(--white); border-radius: var(--radius-lg); border: 1px solid var(--gray-200); padding: 1.5rem; width: 560px; max-width: 100%; margin: auto; }
+    .modal-header { display: flex; align-items: center; margin-bottom: 1.25rem; padding-bottom: 12px; border-bottom: 1px solid var(--gray-100); }
+    .modal-title { font-size: 15px; font-weight: 700; color: var(--coral); text-transform: uppercase; letter-spacing: .05em; }
+    .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.25rem; padding-top: 12px; border-top: 1px solid var(--gray-100); }
+    .sec { font-size: 10px; font-weight: 700; color: var(--coral); margin: 16px 0 8px; text-transform: uppercase; letter-spacing: .1em; border-bottom: 1px solid #F9D4C8; padding-bottom: 5px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .field-row.single { grid-template-columns: 1fr; }
+    .field-row.triple { grid-template-columns: 1fr 1fr 1fr; }
+    label.fl { font-size: 12px; color: var(--gray-600); display: block; margin-bottom: 4px; }
+    .toggle-group { display: flex; border: 1px solid var(--gray-300); border-radius: var(--radius-md); overflow: hidden; }
+    .toggle-btn { flex: 1; border: none; padding: 8px 0; font-size: 13px; background: var(--gray-100); color: var(--gray-500); cursor: pointer; transition: background .15s; font-weight: 400; border-radius: 0; }
+    .toggle-btn.on { background: var(--coral); color: #fff; font-weight: 600; }
+    .toggle-btn.on-yes { background: #1D9E75; color: #fff; font-weight: 600; }
+    .toggle-btn.on-no { background: var(--gray-300); color: #666; font-weight: 500; }
+    .menu-note-box { border: 1px solid var(--coral-mid); border-radius: var(--radius-md); background: var(--coral-pale); padding: 10px; margin-top: 8px; margin-bottom: 12px; }
+    .menu-note-box textarea { background: #fff8f5; border-color: var(--coral-mid); }
+    .conflict-warn { background: #FEF0E8; color: #B84020; border: 1px solid var(--coral-mid); border-radius: var(--radius-md); padding: 8px 12px; font-size: 12px; margin-bottom: 12px; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--black); color: #fff; padding: 10px 22px; border-radius: 30px; font-size: 13px; font-weight: 500; z-index: 999; opacity: 0; transition: opacity .3s; white-space: nowrap; pointer-events: none; }
+    .toast.show { opacity: 1; }
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(240,90,53,.25); border-top-color: var(--coral); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 640px) {
+      .field-row { grid-template-columns: 1fr; }
+      .field-row.triple { grid-template-columns: 1fr 1fr; }
+      .cal-event { font-size: 9px; }
+      .cal-day { min-height: 56px; }
+      .header-inner { flex-wrap: wrap; gap: 8px; }
+      .user-email { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen" class="login-wrap">
+    <div class="login-card">
+      <div class="brand-header">
+        <div class="brand-name">GOSSIP</div>
+        <div class="brand-sub">Artisan Bakery &amp; Cafe</div>
+      </div>
+      <div class="login-title">Sign in to Bookings</div>
+      <div id="login-error" class="error-msg" style="display:none"></div>
+      <label class="fl">Email</label>
+      <input type="email" id="login-email" placeholder="you@example.com" />
+      <label class="fl" style="margin-top:12px">Password</label>
+      <input type="password" id="login-password" placeholder="••••••••" />
+      <button class="btn-coral" id="login-btn" style="width:100%;margin-top:20px;padding:10px">Sign in</button>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="main-app" style="display:none">
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="brand-lockup">
+          <div class="brand-name">GOSSIP</div>
+          <div class="brand-sub">Artisan Bakery &amp; Cafe</div>
+        </div>
+        <div class="header-divider"></div>
+        <div class="header-label">Bookings</div>
+        <div class="header-right">
+          <span id="user-role-badge" class="role-badge"></span>
+          <span id="user-email-display" class="user-email"></span>
+          <button class="btn-ghost" id="logout-btn" style="padding:5px 12px;font-size:13px;background:rgba(255,255,255,0.1);color:#ccc;border-color:#444">Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <div class="action-bar">
+        <div class="tabs">
+          <button class="tab-btn active" data-view="calendar">Calendar</button>
+          <button class="tab-btn" data-view="list">List view</button>
+        </div>
+        <div class="action-right">
+          <div id="list-filter" style="display:none">
+            <select id="filter-type">
+              <option value="All">All types</option>
+              <option value="Table Booking">Table Booking</option>
+              <option value="Private Area">Private Area</option>
+            </select>
+          </div>
+          <button class="btn-coral" id="new-btn">+ New booking</button>
+        </div>
+      </div>
+
+      <div id="view-calendar">
+        <div class="cal-nav">
+          <button class="btn-nav" id="prev-m">&#8249;</button>
+          <span id="cal-month-label" class="month-label"></span>
+          <button class="btn-nav" id="next-m">&#8250;</button>
+        </div>
+        <div class="cal-grid" id="cal-headers"></div>
+        <div class="cal-grid" id="cal-cells"></div>
+        <div class="cal-legend">
+          <span class="legend-item"><span class="legend-dot dot-table"></span>Table booking</span>
+          <span class="legend-item"><span class="legend-dot dot-private"></span>Private area</span>
+        </div>
+      </div>
+
+      <div id="view-list" style="display:none">
+        <div id="list-container"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL -->
+  <div id="modal-overlay" class="modal-overlay" style="display:none">
+    <div class="modal" id="modal-box">
+      <div class="modal-header">
+        <span id="modal-title" class="modal-title"></span>
+        <button class="btn-close" id="modal-close">&#x2715;</button>
+      </div>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast" style="display:none"></div>
+
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    // ── REPLACE THESE WITH YOUR FIREBASE CONFIG ──────────────────
+    const firebaseConfig = {
+      apiKey:            "AIzaSyAITydT4tYzjOyP3m995_WHh188omR8drU",
+      authDomain:        "gossipbookings.firebaseapp.com",
+      projectId:         "gossipbookings",
+      storageBucket:     "gossipbookings.firebasestorage.app",
+      messagingSenderId: "612011316352",
+      appId:             "1:612011316352:web:50cf6f27fc36101a5f8265"
+    };
+    // ─────────────────────────────────────────────────────────────
+
+    const firebaseApp = initializeApp(firebaseConfig);
+    const auth = getAuth(firebaseApp);
+    const db   = getFirestore(firebaseApp);
+
+    const BOOKING_TYPES = ['Table Booking', 'Private Area'];
+    const EVENT_TYPES   = ['Birthday', 'Kitty', 'Meeting', 'Private Dinner'];
+    const ROLES         = { admin: 'Admin', manager: 'Manager', staff: 'Staff' };
+
+    let state = {
+      user: null, userRole: null, bookings: [], view: 'calendar',
+      month: new Date().getMonth(), year: new Date().getFullYear(),
+      selectedDate: null, modalMode: null, editBookingId: null,
+      formData: {}, unsubscribe: null,
+    };
+
+    function todayStr() { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function showToast(msg, duration = 2500) {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.style.display = 'block'; t.classList.add('show');
+      setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.style.display='none', 300); }, duration);
+    }
+
+    function checkConflict(f, excludeId = null) {
+      if (f.type !== 'Private Area') return false;
+      return state.bookings.some(b => {
+        if (b.type !== 'Private Area') return false;
+        if (excludeId && b.id === excludeId) return false;
+        if (b.date !== f.date) return false;
+        return f.fromTime < (b.toTime||'23:59') && (f.toTime||'23:59') > b.fromTime;
+      });
+    }
+
+    // ── AUTH ──
+    document.getElementById('login-btn').addEventListener('click', async () => {
+      const email = document.getElementById('login-email').value.trim();
+      const pass  = document.getElementById('login-password').value;
+      const errEl = document.getElementById('login-error');
+      const btn   = document.getElementById('login-btn');
+      errEl.style.display = 'none';
+      btn.innerHTML = '<span class="spinner"></span>Signing in…'; btn.disabled = true;
+      try { await signInWithEmailAndPassword(auth, email, pass); }
+      catch (e) {
+        errEl.textContent = 'Incorrect email or password. Please try again.';
+        errEl.style.display = 'block'; btn.textContent = 'Sign in'; btn.disabled = false;
+      }
+    });
+
+    document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-btn').click(); });
+    document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+
+    onAuthStateChanged(auth, async user => {
+      if (user) {
+        state.user = user;
+        try {
+          const snap = await getDoc(doc(db, 'users', user.uid));
+          state.userRole = snap.exists() ? (snap.data().role || 'staff') : 'staff';
+        } catch { state.userRole = 'staff'; }
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('main-app').style.display = 'block';
+        document.getElementById('user-role-badge').textContent = ROLES[state.userRole] || state.userRole;
+        document.getElementById('user-email-display').textContent = user.email;
+        startBookingsListener(); renderCalendar();
+      } else {
+        state.user = null;
+        if (state.unsubscribe) { state.unsubscribe(); state.unsubscribe = null; }
+        document.getElementById('login-screen').style.display = 'flex';
+        document.getElementById('main-app').style.display = 'none';
+        document.getElementById('login-btn').textContent = 'Sign in';
+        document.getElementById('login-btn').disabled = false;
+      }
+    });
+
+    // ── FIRESTORE ──
+    function startBookingsListener() {
+      if (state.unsubscribe) state.unsubscribe();
+      const q = query(collection(db, 'bookings'), orderBy('date'), orderBy('fromTime'));
+      state.unsubscribe = onSnapshot(q, snap => {
+        state.bookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (state.view === 'calendar') renderCalendar(); else renderList();
+      }, err => { console.error(err); showToast('Error loading bookings.'); });
+    }
+
+    // ── TABS ──
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active'); state.view = btn.dataset.view;
+        document.getElementById('view-calendar').style.display = state.view === 'calendar' ? 'block' : 'none';
+        document.getElementById('view-list').style.display     = state.view === 'list'     ? 'block' : 'none';
+        document.getElementById('list-filter').style.display   = state.view === 'list'     ? 'flex'  : 'none';
+        if (state.view === 'calendar') renderCalendar(); else renderList();
+      });
+    });
+    document.getElementById('filter-type').addEventListener('change', renderList);
+
+    // ── CALENDAR ──
+    function renderCalendar() {
+      const { month, year } = state;
+      document.getElementById('cal-month-label').textContent = `${new Date(year,month,1).toLocaleString('default',{month:'long'})} ${year}`;
+      const hdrs = document.getElementById('cal-headers'); hdrs.innerHTML = '';
+      ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => { const el = document.createElement('div'); el.className = 'cal-header-cell'; el.textContent = d; hdrs.appendChild(el); });
+      const cells = document.getElementById('cal-cells'); cells.innerHTML = '';
+      const first = new Date(year,month,1).getDay(), dim = new Date(year,month+1,0).getDate();
+      const diPrev = new Date(year,month,0).getDate(), today = todayStr();
+      let all = [];
+      for (let i=first-1;i>=0;i--) all.push({day:diPrev-i,cur:false});
+      for (let i=1;i<=dim;i++) all.push({day:i,cur:true});
+      while (all.length%7!==0) all.push({day:all.length-first-dim+1,cur:false});
+      all.forEach(c => {
+        const ds = c.cur ? `${year}-${pad(month+1)}-${pad(c.day)}` : '';
+        const bks = ds ? state.bookings.filter(b => b.date===ds) : [];
+        const cell = document.createElement('div');
+        cell.className = `cal-day${!c.cur?' other-month':''}${ds===today?' today':''}${ds===state.selectedDate?' selected':''}`;
+        if (ds) cell.dataset.date = ds;
+        const num = document.createElement('div'); num.className='day-num'; num.textContent=c.day; cell.appendChild(num);
+        bks.slice(0,3).forEach(b => {
+          const ev = document.createElement('div');
+          ev.className = `cal-event ${b.type==='Private Area'?'ev-private':'ev-table'}`;
+          ev.textContent = `${b.type==='Private Area'?'Pvt':'Tbl'} · ${b.name.split(' ')[0]}`;
+          ev.dataset.bookingId = b.id;
+          ev.addEventListener('click', e => { e.stopPropagation(); openViewModal(b.id); });
+          cell.appendChild(ev);
+        });
+        if (bks.length>3) { const more=document.createElement('div'); more.className='cal-more'; more.textContent=`+${bks.length-3} more`; cell.appendChild(more); }
+        if (c.cur) cell.addEventListener('click', e => { if (e.target.dataset.bookingId) return; state.selectedDate=ds; openNewModal(ds); });
+        cells.appendChild(cell);
+      });
+    }
+
+    document.getElementById('prev-m').addEventListener('click', () => { state.month--; if(state.month<0){state.month=11;state.year--;} renderCalendar(); });
+    document.getElementById('next-m').addEventListener('click', () => { state.month++; if(state.month>11){state.month=0;state.year++;} renderCalendar(); });
+
+    // ── LIST ──
+    function renderList() {
+      const filter = document.getElementById('filter-type').value;
+      let list = filter==='All' ? [...state.bookings] : state.bookings.filter(b=>b.type===filter);
+      const container = document.getElementById('list-container');
+      if (!list.length) { container.innerHTML = '<div class="list-empty">No bookings found.</div>'; return; }
+      container.innerHTML = '';
+      const wrap = document.createElement('div'); wrap.className = 'list-container';
+      list.forEach(b => {
+        const row = document.createElement('div'); row.className = 'list-row';
+        row.innerHTML = `
+          <div class="list-info">
+            <div class="list-name">${b.name}</div>
+            <div class="list-meta">${b.date} · ${b.fromTime}–${b.toTime} · ${b.guests} guests · ${b.event}</div>
+            <div class="list-extra">${b.menuChoice}${b.decoration?' · Decoration':''}${b.advance&&b.advance!=='0'?' · Adv: ₹'+b.advance:''}</div>
+          </div>
+          <span class="badge ${b.type==='Private Area'?'badge-private':'badge-table'}">${b.type}</span>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn-edit" data-edit="${b.id}">Edit</button>
+            ${state.userRole==='admin'?`<button class="btn-del" data-del="${b.id}">Delete</button>`:''}
+          </div>`;
+        row.querySelector('[data-edit]')?.addEventListener('click', () => openEditModal(b.id));
+        row.querySelector('[data-del]')?.addEventListener('click', () => deleteBooking(b.id, b.name));
+        wrap.appendChild(row);
+      });
+      container.appendChild(wrap);
+    }
+
+    document.getElementById('new-btn').addEventListener('click', () => openNewModal(todayStr()));
+
+    // ── MODAL ──
+    function openNewModal(date=todayStr()) {
+      state.modalMode='new'; state.editBookingId=null;
+      state.formData={date,type:'Table Booking',event:EVENT_TYPES[0],menuChoice:'A-la-carte',menuNote:'',decoration:false,fromTime:'',toTime:'',guests:'',advance:'',phone:'',notes:'',name:''};
+      renderModal();
+    }
+    function openEditModal(id) {
+      const b=state.bookings.find(x=>x.id===id); if(!b) return;
+      state.modalMode='edit'; state.editBookingId=id; state.formData={...b}; renderModal();
+    }
+    function openViewModal(id) {
+      const b=state.bookings.find(x=>x.id===id); if(!b) return;
+      state.modalMode='view'; state.editBookingId=id; state.formData={...b}; renderModal();
+    }
+
+    function renderModal() {
+      const {modalMode:mode,formData:f,userRole} = state;
+      const isView=mode==='view', isNew=mode==='new', dis=isView?'disabled':'';
+      const conflict=!isView&&checkConflict(f,isNew?null:state.editBookingId);
+      const mc=f.menuChoice||'A-la-carte', dec=!!f.decoration;
+      document.getElementById('modal-title').textContent = {new:'New booking',edit:'Edit booking',view:'Booking details'}[mode];
+      document.getElementById('modal-body').innerHTML = `
+        ${conflict?`<div class="conflict-warn">&#9888; Private Area already booked for an overlapping time on this date.</div>`:''}
+        <div class="sec">Guest info</div>
+        <div class="field-row">
+          <div><label class="fl">Guest name *</label><input id="f-name" value="${esc(f.name||'')}" placeholder="Full name" ${dis}></div>
+          <div><label class="fl">Phone</label><input id="f-phone" value="${esc(f.phone||'')}" placeholder="+91 xxxxx xxxxx" ${dis}></div>
+        </div>
+        <div class="sec">Booking details</div>
+        <div class="field-row">
+          <div><label class="fl">Booking type *</label><select id="f-type" ${dis}>${BOOKING_TYPES.map(t=>`<option ${f.type===t?'selected':''}>${t}</option>`).join('')}</select></div>
+          <div><label class="fl">Date *</label><input type="date" id="f-date" value="${f.date||''}" ${dis}></div>
+        </div>
+        <div class="field-row triple">
+          <div><label class="fl">From time *</label><input type="time" id="f-from" value="${f.fromTime||''}" ${dis}></div>
+          <div><label class="fl">To time *</label><input type="time" id="f-to" value="${f.toTime||''}" ${dis}></div>
+          <div><label class="fl">No. of guests *</label><input type="number" id="f-guests" value="${f.guests||''}" min="1" max="300" ${dis}></div>
+        </div>
+        <div class="field-row">
+          <div><label class="fl">Event type</label><select id="f-event" ${dis}>${EVENT_TYPES.map(e=>`<option ${f.event===e?'selected':''}>${e}</option>`).join('')}</select></div>
+          <div><label class="fl">Advance amount (₹)</label><input type="number" id="f-advance" value="${f.advance||''}" placeholder="0" min="0" ${dis}></div>
+        </div>
+        <div class="sec">Menu preference</div>
+        <label class="fl">Menu choice</label>
+        <div class="toggle-group" style="max-width:240px;margin-bottom:4px">
+          <button type="button" class="toggle-btn ${mc==='A-la-carte'?'on':''}" id="menu-alacarte" ${dis}>A-la-carte</button>
+          <button type="button" class="toggle-btn ${mc==='Fixed'?'on':''}" id="menu-fixed" ${dis}>Fixed menu</button>
+        </div>
+        <div id="menu-note-wrap" style="display:${mc==='Fixed'?'block':'none'}">
+          <div class="menu-note-box">
+            <label class="fl" style="color:#C03A1A">Fixed menu details</label>
+            <textarea id="f-menunote" rows="3" placeholder="Starters, mains, desserts, drinks…" ${dis}>${esc(f.menuNote||'')}</textarea>
+          </div>
+        </div>
+        <div class="sec">Decoration</div>
+        <label class="fl">Decoration required?</label>
+        <div class="toggle-group" style="max-width:160px;margin-bottom:12px">
+          <button type="button" class="toggle-btn ${dec?'on-yes':''}" id="dec-yes" ${dis}>Yes</button>
+          <button type="button" class="toggle-btn ${!dec?'on-no':''}" id="dec-no" ${dis}>No</button>
+        </div>
+        <div class="sec">Additional notes</div>
+        <div class="field-row single">
+          <textarea id="f-notes" rows="2" placeholder="Special requests, seating, equipment…" ${dis}>${esc(f.notes||'')}</textarea>
+        </div>
+        <div class="modal-footer">
+          ${isView
+            ? `<button class="btn-ghost" id="m-close">Close</button>
+               <button class="btn-coral" id="m-edit" style="padding:8px 20px">Edit</button>
+               ${userRole==='admin'?`<button class="btn-del" id="m-del" style="padding:8px 20px">Delete</button>`:''}`
+            : `<button class="btn-ghost" id="m-cancel">Cancel</button>
+               <button class="btn-coral" id="m-save" style="padding:8px 22px" ${conflict?'disabled':''}>Save booking</button>`}
+        </div>`;
+
+      if (!isView) {
+        document.getElementById('menu-alacarte')?.addEventListener('click', () => { syncForm(); state.formData.menuChoice='A-la-carte'; renderModal(); });
+        document.getElementById('menu-fixed')?.addEventListener('click',    () => { syncForm(); state.formData.menuChoice='Fixed';      renderModal(); });
+        document.getElementById('dec-yes')?.addEventListener('click',       () => { syncForm(); state.formData.decoration=true;         renderModal(); });
+        document.getElementById('dec-no')?.addEventListener('click',        () => { syncForm(); state.formData.decoration=false;        renderModal(); });
+        ['f-type','f-date','f-from','f-to'].forEach(id => document.getElementById(id)?.addEventListener('change', () => { syncForm(); renderModal(); }));
+        document.getElementById('m-save')?.addEventListener('click', saveBooking);
+        document.getElementById('m-cancel')?.addEventListener('click', closeModal);
+      } else {
+        document.getElementById('m-close')?.addEventListener('click', closeModal);
+        document.getElementById('m-edit')?.addEventListener('click',  () => { state.modalMode='edit'; renderModal(); });
+        document.getElementById('m-del')?.addEventListener('click',   () => deleteBooking(state.editBookingId, f.name));
+      }
+      document.getElementById('modal-overlay').style.display = 'flex';
+    }
+
+    function syncForm() {
+      const gv = id => { const el=document.getElementById(id); return el?el.value.trim():''; };
+      state.formData = { ...state.formData, name:gv('f-name'), phone:gv('f-phone'), type:gv('f-type'), date:gv('f-date'), fromTime:gv('f-from'), toTime:gv('f-to'), guests:gv('f-guests'), event:gv('f-event'), advance:gv('f-advance'), menuNote:gv('f-menunote'), notes:gv('f-notes') };
+    }
+
+    function closeModal() {
+      document.getElementById('modal-overlay').style.display = 'none';
+      state.modalMode = null; state.formData = {};
+    }
+
+    document.getElementById('modal-close').addEventListener('click', closeModal);
+    document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target===document.getElementById('modal-overlay')) closeModal(); });
+
+    async function saveBooking() {
+      syncForm(); const f = state.formData;
+      if (!f.name)     { alert('Guest name is required'); return; }
+      if (!f.date)     { alert('Date is required'); return; }
+      if (!f.fromTime) { alert('From time is required'); return; }
+      if (!f.toTime)   { alert('To time is required'); return; }
+      if (!f.guests)   { alert('Number of guests is required'); return; }
+      if (f.fromTime >= f.toTime) { alert('To time must be after From time'); return; }
+      if (checkConflict(f, state.modalMode==='new'?null:state.editBookingId)) { alert('Private Area is already booked for this time.'); return; }
+      const btn = document.getElementById('m-save');
+      btn.innerHTML = '<span class="spinner"></span>Saving…'; btn.disabled = true;
+      const data = {
+        name:f.name, phone:f.phone||'', type:f.type, date:f.date,
+        fromTime:f.fromTime, toTime:f.toTime, guests:parseInt(f.guests)||1,
+        event:f.event, advance:f.advance||'0', menuChoice:f.menuChoice,
+        menuNote:f.menuNote||'', decoration:!!f.decoration, notes:f.notes||'',
+        updatedAt:new Date().toISOString(), updatedBy:state.user.email,
+      };
+      try {
+        if (state.modalMode==='new') {
+          data.createdAt=new Date().toISOString(); data.createdBy=state.user.email;
+          await addDoc(collection(db,'bookings'), data); showToast('Booking created!');
+        } else {
+          await updateDoc(doc(db,'bookings',state.editBookingId), data); showToast('Booking updated!');
+        }
+        closeModal();
+      } catch(e) { console.error(e); alert('Error saving. Please try again.'); btn.textContent='Save booking'; btn.disabled=false; }
+    }
+
+    async function deleteBooking(id, name) {
+      if (!confirm(`Delete booking for "${name}"? This cannot be undone.`)) return;
+      try { await deleteDoc(doc(db,'bookings',id)); closeModal(); showToast('Booking deleted.'); }
+      catch(e) { console.error(e); alert('Error deleting. Check your permissions.'); }
+    }
+
+    function esc(str) { return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  </script>
+</body>
+</html>
