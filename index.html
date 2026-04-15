@@ -4,6 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gossip! Bookings</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#1a1a1a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="apple-mobile-web-app-title" content="Gossip!" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #1a1a1a; min-height: 100vh; font-size: 14px; line-height: 1.5; }
@@ -372,6 +378,7 @@
         document.getElementById('user-email-display').textContent=user.email;
         document.getElementById('manage-users-btn').style.display=state.userRole==='admin'?'inline-block':'none';
         startListeners(); renderCalendar(); renderTodayPanel();
+        document.dispatchEvent(new CustomEvent('gossip:authed'));
       } else {
         state.user=null;
         [state.unsubBookings,state.unsubNotes,state.unsubUsers].forEach(u=>u&&u());
@@ -389,6 +396,7 @@
         state.bookings=snap.docs.map(d=>({id:d.id,...d.data()}));
         if(state.view==='calendar') renderCalendar(); else renderList();
         renderTodayPanel();
+        document.dispatchEvent(new CustomEvent('gossip:bookings-updated', { detail: state.bookings }));
       }, err=>{ console.error(err); showToast('Error loading bookings.'); });
 
       if(state.unsubNotes) state.unsubNotes();
@@ -752,6 +760,77 @@
 
     // ── ALSO update Firestore rules to allow notes collection ──
     // Add to firestore.rules: match /notes/{n} { allow read,write: if request.auth != null; }
+  </script>
+
+  <!-- PWA: Service Worker + Notifications -->
+  <script>
+    const NOTIF_MINUTES = 30; // fire notification this many minutes before booking
+    let swRegistration = null;
+    const scheduledNotifs = new Set();
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then(reg => {
+        swRegistration = reg;
+        console.log('SW registered');
+      }).catch(err => console.warn('SW registration failed:', err));
+    }
+
+    // Request notification permission after login
+    function requestNotifPermission() {
+      if (!('Notification' in window)) return;
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then(perm => {
+          if (perm === 'granted') showToast('Notifications enabled ✓');
+        });
+      }
+    }
+
+    // Schedule notifications for all upcoming bookings today & tomorrow
+    function scheduleAllNotifications(bookings) {
+      if (!swRegistration || Notification.permission !== 'granted') return;
+      const now = new Date();
+
+      bookings.forEach(b => {
+        if (!b.date || !b.fromTime) return;
+        const [year, month, day] = b.date.split('-').map(Number);
+        const [hour, min] = b.fromTime.split(':').map(Number);
+        const bookingTime = new Date(year, month - 1, day, hour, min);
+        const notifTime = new Date(bookingTime.getTime() - NOTIF_MINUTES * 60 * 1000);
+        const delay = notifTime.getTime() - now.getTime();
+
+        // Only schedule if it's in the future and within next 24 hours
+        // and we haven't already scheduled this one
+        const key = `${b.id}-${b.fromTime}`;
+        if (delay > 0 && delay < 24 * 60 * 60 * 1000 && !scheduledNotifs.has(key)) {
+          scheduledNotifs.add(key);
+          swRegistration.active?.postMessage({
+            type: 'SCHEDULE_NOTIFICATION',
+            booking: b,
+            delay: delay
+          });
+        }
+      });
+    }
+
+    // Cancel notification for a deleted booking
+    function cancelNotification(bookingId) {
+      if (!swRegistration) return;
+      swRegistration.active?.postMessage({
+        type: 'CANCEL_NOTIFICATION',
+        bookingId: bookingId
+      });
+    }
+
+    // Hook into auth state — request permission once logged in
+    // and re-schedule whenever bookings change
+    const _origOnAuth = window._onAuthReady;
+    document.addEventListener('gossip:authed', () => {
+      setTimeout(requestNotifPermission, 2000);
+    });
+    document.addEventListener('gossip:bookings-updated', e => {
+      scheduleAllNotifications(e.detail || []);
+    });
   </script>
 </body>
 </html>
