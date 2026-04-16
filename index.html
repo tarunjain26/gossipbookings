@@ -304,7 +304,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, setDoc, onSnapshot, query, orderBy, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
     // ── REPLACE WITH YOUR FIREBASE CONFIG ──────────────────────
     const firebaseConfig = {
@@ -320,39 +319,6 @@
     const fbApp = initializeApp(firebaseConfig);
     const auth  = getAuth(fbApp);
     const db    = getFirestore(fbApp);
-    const messaging = getMessaging(fbApp);
-
-    // ── FCM: Register device token ─────────────────────────
-    // REPLACE with your VAPID key from Firebase Console
-    // (Project Settings → Cloud Messaging → Web Push certificates → Key pair)
-    const VAPID_KEY = "BPyDZMgA0ARQkgSDencXWjYR1ZiIT0dTT7-2s-ehCe9DL795qptD8rusvBYXjaLPk15XGHRYQopGu5EIHho2BbU";
-
-    async function registerFCMToken() {
-      try {
-        const token = await getToken(messaging, {
-          vapidKey: VAPID_KEY,
-          serviceWorkerRegistration: await navigator.serviceWorker.getRegistration('/gossipbookings/sw.js')
-        });
-        if (token) {
-          // Save token to Firestore so Cloud Function can find it
-          await setDoc(doc(db, 'fcmTokens', token), {
-            token,
-            userId: auth.currentUser?.uid,
-            userEmail: auth.currentUser?.email,
-            updatedAt: new Date().toISOString()
-          });
-          console.log('FCM token registered');
-        }
-      } catch (err) {
-        console.warn('FCM token registration failed:', err);
-      }
-    }
-
-    // Show in-app notification banner when app is in foreground
-    onMessage(messaging, (payload) => {
-      const { title, body } = payload.notification || {};
-      if (title || body) showToast(`${title}: ${body}`, 6000);
-    });
 
     const BOOKING_TYPES = ['Table Booking','Private Area'];
     const EVENT_TYPES   = ['Birthday','Kitty','Meeting','Private Dinner'];
@@ -412,8 +378,6 @@
         document.getElementById('user-email-display').textContent=user.email;
         document.getElementById('manage-users-btn').style.display=state.userRole==='admin'?'inline-block':'none';
         startListeners(); renderCalendar(); renderTodayPanel();
-        document.dispatchEvent(new CustomEvent('gossip:authed'));
-        registerFCMToken();
       } else {
         state.user=null;
         [state.unsubBookings,state.unsubNotes,state.unsubUsers].forEach(u=>u&&u());
@@ -431,7 +395,6 @@
         state.bookings=snap.docs.map(d=>({id:d.id,...d.data()}));
         if(state.view==='calendar') renderCalendar(); else renderList();
         renderTodayPanel();
-        document.dispatchEvent(new CustomEvent('gossip:bookings-updated', { detail: state.bookings }));
       }, err=>{ console.error(err); showToast('Error loading bookings.'); });
 
       if(state.unsubNotes) state.unsubNotes();
@@ -797,75 +760,5 @@
     // Add to firestore.rules: match /notes/{n} { allow read,write: if request.auth != null; }
   </script>
 
-  <!-- PWA: Service Worker + Notifications -->
-  <script>
-    const NOTIF_MINUTES = 30; // fire notification this many minutes before booking
-    let swRegistration = null;
-    const scheduledNotifs = new Set();
-
-    // Register service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/gossipbookings/sw.js', { scope: '/gossipbookings/' }).then(reg => {
-        swRegistration = reg;
-        console.log('SW registered');
-      }).catch(err => console.warn('SW registration failed:', err));
-    }
-
-    // Request notification permission after login
-    function requestNotifPermission() {
-      if (!('Notification' in window)) return;
-      if (Notification.permission === 'default') {
-        Notification.requestPermission().then(perm => {
-          if (perm === 'granted') showToast('Notifications enabled ✓');
-        });
-      }
-    }
-
-    // Schedule notifications for all upcoming bookings today & tomorrow
-    function scheduleAllNotifications(bookings) {
-      if (!swRegistration || Notification.permission !== 'granted') return;
-      const now = new Date();
-
-      bookings.forEach(b => {
-        if (!b.date || !b.fromTime) return;
-        const [year, month, day] = b.date.split('-').map(Number);
-        const [hour, min] = b.fromTime.split(':').map(Number);
-        const bookingTime = new Date(year, month - 1, day, hour, min);
-        const notifTime = new Date(bookingTime.getTime() - NOTIF_MINUTES * 60 * 1000);
-        const delay = notifTime.getTime() - now.getTime();
-
-        // Only schedule if it's in the future and within next 24 hours
-        // and we haven't already scheduled this one
-        const key = `${b.id}-${b.fromTime}`;
-        if (delay > 0 && delay < 24 * 60 * 60 * 1000 && !scheduledNotifs.has(key)) {
-          scheduledNotifs.add(key);
-          swRegistration.active?.postMessage({
-            type: 'SCHEDULE_NOTIFICATION',
-            booking: { ...b, icon: '/gossipbookings/icon-192.png' },
-            delay: delay
-          });
-        }
-      });
-    }
-
-    // Cancel notification for a deleted booking
-    function cancelNotification(bookingId) {
-      if (!swRegistration) return;
-      swRegistration.active?.postMessage({
-        type: 'CANCEL_NOTIFICATION',
-        bookingId: bookingId
-      });
-    }
-
-    // Hook into auth state — request permission once logged in
-    // and re-schedule whenever bookings change
-    const _origOnAuth = window._onAuthReady;
-    document.addEventListener('gossip:authed', () => {
-      setTimeout(requestNotifPermission, 2000);
-    });
-    document.addEventListener('gossip:bookings-updated', e => {
-      scheduleAllNotifications(e.detail || []);
-    });
-  </script>
 </body>
 </html>
