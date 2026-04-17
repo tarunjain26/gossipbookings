@@ -75,7 +75,7 @@
     .today-booking-item:last-child{border-bottom:none;}
     .today-booking-item:hover .today-booking-name{color:var(--coral);}
     .today-dot{width:7px;height:7px;border-radius:50%;margin-top:4px;flex-shrink:0;}
-    .dot-tbl{background:var(--coral);} .dot-pvt{background:#aaa;}
+    .dot-tbl{background:var(--coral);} .dot-pvt{background:#aaa;} .dot-enq{background:#639922;}
     .today-booking-name{font-size:13px;font-weight:600;color:var(--black);}
     .today-booking-meta{font-size:11px;color:var(--gray-500);margin-top:1px;}
     .today-time{font-size:11px;font-weight:700;color:var(--coral);white-space:nowrap;margin-top:2px;}
@@ -115,11 +115,12 @@
     .cal-event{font-size:10px;padding:2px 5px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;font-weight:600;}
     .ev-table{background:var(--coral-light);color:#C03A1A;border-left:2px solid var(--coral);}
     .ev-private{background:#f0f0f0;color:#555;border-left:2px solid #aaa;}
+    .ev-enquiry{background:#EAF3DE;color:#27500A;border-left:2px solid #639922;}
     .cal-more{font-size:9px;color:var(--gray-400);margin-top:1px;}
     .cal-legend{display:flex;gap:16px;margin-top:12px;}
     .legend-item{font-size:12px;color:var(--gray-600);display:flex;align-items:center;gap:5px;}
     .legend-dot{width:10px;height:10px;border-radius:2px;display:inline-block;}
-    .dot-table{background:var(--coral);} .dot-private{background:#ccc;}
+    .dot-table{background:var(--coral);} .dot-private{background:#ccc;} .dot-enquiry{background:#639922;}
 
     .list-container{border:1px solid var(--gray-200);border-radius:var(--radius-lg);background:var(--white);overflow:hidden;}
     .list-row{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--gray-100);transition:background .1s;}
@@ -133,6 +134,7 @@
     .badge{display:inline-block;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;white-space:nowrap;letter-spacing:.02em;}
     .badge-table{background:var(--coral-light);color:#C03A1A;border:1px solid var(--coral-mid);}
     .badge-private{background:#f0f0f0;color:#555;border:1px solid #ddd;}
+    .badge-enquiry{background:#EAF3DE;color:#27500A;border:1px solid #97C459;}
     .badge-admin{background:#1a1a1a;color:var(--coral);border:1px solid #333;}
     .badge-manager{background:#EAF3DE;color:#27500A;border:1px solid #C0DD97;}
     .badge-staff{background:var(--gray-100);color:var(--gray-700);border:1px solid var(--gray-300);}
@@ -220,6 +222,7 @@
               <option value="All">All types</option>
               <option value="Table Booking">Table Booking</option>
               <option value="Private Area">Private Area</option>
+              <option value="Enquiry">Enquiry</option>
             </select>
           </div>
           <button class="btn-coral" id="new-btn">+ New booking</button>
@@ -240,6 +243,7 @@
             <div class="cal-legend">
               <span class="legend-item"><span class="legend-dot dot-table"></span>Table booking</span>
               <span class="legend-item"><span class="legend-dot dot-private"></span>Private area</span>
+              <span class="legend-item"><span class="legend-dot dot-enquiry"></span>Enquiry</span>
             </div>
           </div>
           <div id="view-list" style="display:none">
@@ -263,7 +267,7 @@
             <div class="today-count-bar">
               <div class="count-chip"><div class="count-num" id="today-total">0</div><div class="count-lbl">Total</div></div>
               <div class="count-chip"><div class="count-num" id="today-tables">0</div><div class="count-lbl">Tables</div></div>
-              <div class="count-chip"><div class="count-num" id="today-pvt">0</div><div class="count-lbl">Private</div></div>
+              <div class="count-chip"><div class="count-num" id="today-pvt">0</div><div class="count-lbl">Pvt/Enq</div></div>
             </div>
             <div id="today-bookings-list" class="today-bookings-list"></div>
           </div>
@@ -320,7 +324,7 @@
     const auth  = getAuth(fbApp);
     const db    = getFirestore(fbApp);
 
-    const BOOKING_TYPES = ['Table Booking','Private Area'];
+    const BOOKING_TYPES = ['Table Booking','Private Area','Enquiry'];
     const EVENT_TYPES   = ['Birthday','Kitty','Meeting','Private Dinner'];
     const ROLES         = {admin:'Admin',manager:'Manager',staff:'Staff'};
 
@@ -423,12 +427,12 @@
       const tbks=[...state.bookings.filter(b=>b.date===td)].sort((a,b)=>a.fromTime.localeCompare(b.fromTime));
       document.getElementById('today-total').textContent=tbks.length;
       document.getElementById('today-tables').textContent=tbks.filter(b=>b.type==='Table Booking').length;
-      document.getElementById('today-pvt').textContent=tbks.filter(b=>b.type==='Private Area').length;
+      document.getElementById('today-pvt').textContent=tbks.filter(b=>b.type==='Private Area'||b.type==='Enquiry').length;
       const list=document.getElementById('today-bookings-list');
       if(!tbks.length){ list.innerHTML='<div class="today-empty">No bookings today</div>'; return; }
       list.innerHTML=tbks.map(b=>`
         <div class="today-booking-item" data-id="${b.id}">
-          <span class="today-dot ${b.type==='Private Area'?'dot-pvt':'dot-tbl'}"></span>
+          <span class="today-dot ${b.type==='Private Area'?'dot-pvt':b.type==='Enquiry'?'dot-enq':'dot-tbl'}"></span>
           <div style="flex:1;min-width:0">
             <div class="today-booking-name">${esc(b.name)}</div>
             <div class="today-booking-meta">${b.fromTime}–${b.toTime} · ${b.guests} guests · ${esc(b.event)}</div>
@@ -500,7 +504,7 @@
         const num=document.createElement('div'); num.className='day-num'; num.textContent=c.day; cell.appendChild(num);
         bks.slice(0,3).forEach(b=>{
           const ev=document.createElement('div');
-          ev.className=`cal-event ${b.type==='Private Area'?'ev-private':'ev-table'}`;
+          ev.className=`cal-event ${b.type==='Private Area'?'ev-private':b.type==='Enquiry'?'ev-enquiry':'ev-table'}`;
           ev.textContent=`${b.type==='Private Area'?'Pvt':'Tbl'} · ${b.name.split(' ')[0]}`;
           ev.dataset.bookingId=b.id;
           ev.addEventListener('click',e=>{ e.stopPropagation(); openViewModal(b.id); });
@@ -530,7 +534,7 @@
             <div class="list-meta">${b.date} · ${b.fromTime}–${b.toTime} · ${b.guests} guests · ${esc(b.event)}</div>
             <div class="list-extra">${esc(b.menuChoice)}${b.decoration?' · Decoration':''}${b.advance&&b.advance!=='0'?' · Adv: ₹'+b.advance:''}</div>
           </div>
-          <span class="badge ${b.type==='Private Area'?'badge-private':'badge-table'}">${b.type}</span>
+          <span class="badge ${b.type==='Private Area'?'badge-private':b.type==='Enquiry'?'badge-enquiry':'badge-table'}">${b.type}</span>
           <div style="display:flex;gap:6px;flex-shrink:0">
             <button class="btn-edit" data-edit="${b.id}">Edit</button>
             ${state.userRole==='admin'?`<button class="btn-del" data-del="${b.id}">Delete</button>`:''}
@@ -600,7 +604,7 @@
         </div>
         <div class="sec">Additional notes</div>
         <div class="field-row single">
-          <textarea id="f-notes" rows="2" placeholder="Special requests, seating, equipment…" ${dis}>${esc(f.notes||'')}</textarea>
+          <textarea id="f-notes" rows="6" style="min-height:120px;resize:vertical" placeholder="Special requests, seating, equipment…" ${dis}>${esc(f.notes||'')}</textarea>
         </div>
         <div class="modal-footer">
           ${isView
@@ -615,7 +619,6 @@
         document.getElementById('menu-fixed')?.addEventListener('click',()=>{ syncForm(); state.formData.menuChoice='Fixed'; renderBookingModal(); });
         document.getElementById('dec-yes')?.addEventListener('click',()=>{ syncForm(); state.formData.decoration=true; renderBookingModal(); });
         document.getElementById('dec-no')?.addEventListener('click',()=>{ syncForm(); state.formData.decoration=false; renderBookingModal(); });
-        ['f-type','f-date','f-from','f-to'].forEach(id=>document.getElementById(id)?.addEventListener('change',()=>{ syncForm(); renderBookingModal(); }));
         document.getElementById('m-save')?.addEventListener('click',saveBooking);
         document.getElementById('m-cancel')?.addEventListener('click',closeModal);
       } else {
@@ -643,7 +646,7 @@
       if(!f.toTime){alert('To time is required');return;}
       if(!f.guests){alert('Number of guests is required');return;}
       if(f.fromTime>=f.toTime){alert('To time must be after From time');return;}
-      if(checkConflict(f,state.modalMode==='new'?null:state.editBookingId)){alert('Private Area is already booked for this time.');return;}
+      if(f.type==='Private Area'&&checkConflict(f,state.modalMode==='new'?null:state.editBookingId)){alert('Private Area is already booked for this time. Please choose a different slot.');return;}
       const btn=document.getElementById('m-save');
       btn.innerHTML='<span class="spinner"></span>Saving…'; btn.disabled=true;
       const data={name:f.name,phone:f.phone||'',type:f.type,date:f.date,fromTime:f.fromTime,toTime:f.toTime,guests:parseInt(f.guests)||1,event:f.event,advance:f.advance||'0',menuChoice:f.menuChoice,menuNote:f.menuNote||'',decoration:!!f.decoration,notes:f.notes||'',updatedAt:new Date().toISOString(),updatedBy:state.user.email};
