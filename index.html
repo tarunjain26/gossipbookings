@@ -609,6 +609,7 @@
         <div class="modal-footer">
           ${isView
             ?`<button class="btn-ghost" id="m-close">Close</button>
+              <button class="btn-whatsapp" id="m-whatsapp" style="padding:8px 20px;background:#25D366;color:#fff;border-radius:8px;font-weight:500">&#128222; WhatsApp</button>
               <button class="btn-coral" id="m-edit" style="padding:8px 20px">Edit</button>
               ${userRole==='admin'?`<button class="btn-del" id="m-del" style="padding:8px 20px">Delete</button>`:''}`
             :`<button class="btn-ghost" id="m-cancel">Cancel</button>
@@ -625,6 +626,7 @@
         document.getElementById('m-close')?.addEventListener('click',closeModal);
         document.getElementById('m-edit')?.addEventListener('click',()=>{ state.modalMode='edit'; renderBookingModal(); });
         document.getElementById('m-del')?.addEventListener('click',()=>deleteBooking(state.editBookingId,f.name));
+        document.getElementById('m-whatsapp')?.addEventListener('click',()=>sendWhatsApp(f));
       }
       document.getElementById('modal-overlay').style.display='flex';
     }
@@ -661,6 +663,44 @@
       if(!confirm(`Delete booking for "${name}"? This cannot be undone.`)) return;
       try{await deleteDoc(doc(db,'bookings',id));closeModal();showToast('Booking deleted.');}
       catch(e){console.error(e);alert('Error deleting.');}
+    }
+
+    // ── WHATSAPP CONFIRMATION ──────────────────────────────
+    function sendWhatsApp(b) {
+      if (!b.phone) { alert('No phone number saved for this booking. Please edit the booking and add a phone number first.'); return; }
+
+      // Format date nicely
+      const dateObj = new Date(b.date + 'T00:00:00');
+      const niceDate = dateObj.toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+      // Build the message
+      const lines = [
+        `Hi ${b.name}! 👋`,
+        ``,
+        `Your booking at *Gossip Artisan Bakery & Cafe* has been confirmed. Here are your details:`,
+        ``,
+        `📅 *Date:* ${niceDate}`,
+        `⏰ *Time:* ${b.fromTime} – ${b.toTime}`,
+        `👥 *Guests:* ${b.guests}`,
+        `🎉 *Event:* ${b.event}`,
+        `📍 *Booking type:* ${b.type}`,
+        `🍽️ *Menu:* ${b.menuChoice}${b.menuChoice==='Fixed'&&b.menuNote?'\n    '+b.menuNote:''}`,
+        `💐 *Decoration:* ${b.decoration?'Yes':'No'}`,
+        b.advance&&b.advance!=='0' ? `💰 *Advance received:* ₹${b.advance}` : null,
+        b.notes ? `📝 *Notes:* ${b.notes}` : null,
+        ``,
+        `We look forward to hosting you! 🥐`,
+        `— Team Gossip`,
+      ].filter(l => l !== null).join('\n');
+
+      // Clean phone — remove spaces, dashes, brackets
+      let phone = b.phone.replace(/[\s\-\(\)]/g, '');
+      // Add India country code if not present
+      if (!phone.startsWith('+')) phone = '91' + phone.replace(/^0/, '');
+      else phone = phone.replace('+', '');
+
+      const url = `https://wa.me/${phone}?text=${encodeURIComponent(lines)}`;
+      window.open(url, '_blank');
     }
 
     // ── USER MANAGEMENT ──
