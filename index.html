@@ -176,6 +176,15 @@
     .conflict-warn{background:#FEF0E8;color:#B84020;border:1px solid var(--coral-mid);border-radius:var(--radius-md);padding:8px 12px;font-size:12px;margin-bottom:12px;}
 
     .user-table{width:100%;border-collapse:collapse;margin-top:4px;}
+    .waitlist-card{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;transition:background .1s;}
+    .waitlist-card:hover{background:var(--gray-50);}
+    .waitlist-num{width:44px;height:44px;border-radius:50%;background:#1a1a1a;color:var(--coral);font-size:20px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .waitlist-info{flex:1;min-width:0;}
+    .waitlist-name{font-weight:600;font-size:15px;color:var(--black);}
+    .waitlist-meta{font-size:12px;color:var(--gray-600);margin-top:2px;}
+    .waitlist-eta{font-size:12px;font-weight:600;color:var(--coral);margin-top:3px;}
+    .waitlist-seated{opacity:.5;text-decoration:line-through;}
+    .wl-modal{background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--gray-200);padding:1.5rem;width:520px;max-width:96vw;margin:auto;}
     .user-table th{font-size:11px;font-weight:700;color:var(--gray-600);text-transform:uppercase;letter-spacing:.05em;padding:6px 10px;border-bottom:1px solid var(--gray-200);text-align:left;}
     .user-table td{padding:9px 10px;border-bottom:1px solid var(--gray-100);font-size:13px;vertical-align:middle;}
     .user-table tr:last-child td{border-bottom:none;}
@@ -222,6 +231,7 @@
         <div class="header-right">
           <span id="user-role-badge" class="role-badge"></span>
           <span id="user-email-display" class="user-email"></span>
+          <button id="waitlist-btn" class="btn-ghost" style="padding:5px 12px;font-size:13px;display:none;background:#F05A35;color:#fff;border-color:#F05A35">🪑 Waitlist</button>
           <button id="manage-users-btn" class="btn-ghost" style="padding:5px 12px;font-size:13px;display:none">Manage users</button>
           <button class="btn-ghost" id="logout-btn" style="padding:5px 12px;font-size:13px;background:rgba(255,255,255,0.1);color:#ccc;border-color:#444">Sign out</button>
         </div>
@@ -348,10 +358,10 @@
     const ROLES         = {admin:'Admin',manager:'Manager',staff:'Staff'};
 
     let state = {
-      user:null, userRole:null, bookings:[], notes:[], users:[],
+      user:null, userRole:null, bookings:[], notes:[], users:[], waitlist:[],
       view:'calendar', month:new Date().getMonth(), year:new Date().getFullYear(),
       selectedDate:null, modalMode:null, editBookingId:null, formData:{},
-      unsubBookings:null, unsubNotes:null, unsubUsers:null,
+      unsubBookings:null, unsubNotes:null, unsubUsers:null, unsubWaitlist:null,
     };
 
     // ── UTILS ──
@@ -400,10 +410,11 @@
         document.getElementById('user-role-badge').textContent=ROLES[state.userRole]||state.userRole;
         document.getElementById('user-email-display').textContent=user.email;
         document.getElementById('manage-users-btn').style.display=state.userRole==='admin'?'inline-block':'none';
+        document.getElementById('waitlist-btn').style.display='inline-block';
         startListeners(); renderCalendar(); renderTodayPanel();
       } else {
         state.user=null;
-        [state.unsubBookings,state.unsubNotes,state.unsubUsers].forEach(u=>u&&u());
+        [state.unsubBookings,state.unsubNotes,state.unsubUsers,state.unsubWaitlist].forEach(u=>u&&u());
         document.getElementById('login-screen').style.display='flex';
         document.getElementById('main-app').style.display='none';
         document.getElementById('login-btn').textContent='Sign in';
@@ -432,6 +443,13 @@
         const tbody=document.getElementById('users-tbody');
         if(tbody) renderUsersTable();
       });
+
+      if(state.unsubWaitlist) state.unsubWaitlist();
+      const today=todayStr();
+      state.unsubWaitlist=onSnapshot(
+        query(collection(db,'waitlist'),orderBy('createdAt','asc')),
+        snap=>{ state.waitlist=snap.docs.map(d=>({id:d.id,...d.data()})).filter(w=>w.date===today); }
+      );
     }
 
     // ── TODAY PANEL ──
@@ -740,6 +758,158 @@
 
       const url = `https://wa.me/${phone}?text=${encodeURIComponent(lines)}`;
       window.open(url, '_blank');
+    }
+
+    // ── WAITLIST ────────────────────────────────────────────
+    document.getElementById('waitlist-btn').addEventListener('click', openWaitlist);
+
+    function openWaitlist(){
+      const today = todayStr();
+      const list = (state.waitlist||[]).filter(w=>w.date===today);
+      const nextNum = list.length ? Math.max(...list.map(w=>w.num||0))+1 : 1;
+
+      document.getElementById('modal-title').textContent = '🪑 Waitlist — Today';
+      document.getElementById('modal-body').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+          <div style="background:#1a1a1a;border-radius:var(--radius-lg);padding:14px;text-align:center">
+            <div style="font-size:32px;font-weight:900;color:var(--coral);line-height:1">${list.filter(w=>!w.seated).length}</div>
+            <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-top:3px">Waiting</div>
+          </div>
+          <div style="background:#1a1a1a;border-radius:var(--radius-lg);padding:14px;text-align:center">
+            <div style="font-size:32px;font-weight:900;color:#1D9E75;line-height:1">${list.filter(w=>w.seated).length}</div>
+            <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-top:3px">Seated</div>
+          </div>
+        </div>
+
+        <div class="sec">Add to waitlist</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div><label class="fl">Guest name *</label><input id="wl-name" placeholder="Full name"></div>
+          <div><label class="fl">Phone *</label><input id="wl-phone" placeholder="+91 xxxxx xxxxx" type="tel"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div><label class="fl">Table for (guests)</label><input id="wl-guests" type="number" min="1" max="20" placeholder="2"></div>
+          <div><label class="fl">Est. wait time</label>
+            <select id="wl-eta">
+              <option value="10-15 mins">10–15 mins</option>
+              <option value="15-20 mins">15–20 mins</option>
+              <option value="20-30 mins" selected>20–30 mins</option>
+              <option value="30-45 mins">30–45 mins</option>
+              <option value="45-60 mins">45–60 mins</option>
+              <option value="60+ mins">60+ mins</option>
+            </select>
+          </div>
+        </div>
+        <div id="wl-error" class="error-msg" style="display:none"></div>
+        <button class="btn-coral" id="wl-add-btn" style="width:100%;padding:10px;margin-bottom:1.25rem">Add to waitlist — #${nextNum}</button>
+
+        <div class="sec">Current waitlist</div>
+        <div id="wl-list">
+          ${list.length===0
+            ? `<div style="text-align:center;padding:20px;color:var(--gray-400);font-size:13px">No one on the waitlist today</div>`
+            : list.map(w=>`
+              <div class="waitlist-card ${w.seated?'waitlist-seated':''}">
+                <div class="waitlist-num">#${w.num}</div>
+                <div class="waitlist-info">
+                  <div class="waitlist-name">${esc(w.name)}</div>
+                  <div class="waitlist-meta">${w.phone} · ${w.guests||1} guests</div>
+                  <div class="waitlist-eta">⏱ Est. wait: ${w.eta||'20-30 mins'}</div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+                  ${!w.seated
+                    ? `<button class="btn-green wl-seat-btn" data-id="${w.id}" style="font-size:12px;padding:4px 10px">✓ Seated</button>
+                       <button class="btn-whatsapp wl-wa-btn" data-id="${w.id}" style="font-size:12px;padding:4px 10px;background:#25D366;color:#fff;border-radius:8px;font-weight:500">WhatsApp</button>`
+                    : `<span style="font-size:11px;color:#1D9E75;font-weight:600">✓ Seated</span>`}
+                  ${state.userRole==='admin'?`<button class="btn-del wl-del-btn" data-id="${w.id}" style="font-size:11px;padding:3px 8px">Remove</button>`:''}
+                </div>
+              </div>`).join('')}
+        </div>
+        <div class="modal-footer">
+          <button class="btn-ghost" id="wl-close">Close</button>
+        </div>`;
+
+      // Bind buttons
+      document.getElementById('wl-close').addEventListener('click', closeModal);
+      document.getElementById('wl-add-btn').addEventListener('click', addToWaitlist);
+
+      document.querySelectorAll('.wl-seat-btn').forEach(btn=>{
+        btn.addEventListener('click', async()=>{
+          await updateDoc(doc(db,'waitlist',btn.dataset.id),{seated:true,seatedAt:new Date().toISOString()});
+          openWaitlist();
+        });
+      });
+
+      document.querySelectorAll('.wl-wa-btn').forEach(btn=>{
+        const w=state.waitlist.find(x=>x.id===btn.dataset.id);
+        if(w) btn.addEventListener('click',()=>sendWaitlistWhatsApp(w));
+      });
+
+      document.querySelectorAll('.wl-del-btn').forEach(btn=>{
+        btn.addEventListener('click', async()=>{
+          if(confirm('Remove from waitlist?')){
+            await deleteDoc(doc(db,'waitlist',btn.dataset.id));
+            openWaitlist();
+          }
+        });
+      });
+
+      document.getElementById('modal-overlay').style.display='flex';
+    }
+
+    async function addToWaitlist(){
+      const name=document.getElementById('wl-name').value.trim();
+      const phone=document.getElementById('wl-phone').value.trim();
+      const guests=document.getElementById('wl-guests').value||'1';
+      const eta=document.getElementById('wl-eta').value;
+      const errEl=document.getElementById('wl-error');
+      errEl.style.display='none';
+      if(!name){errEl.textContent='Guest name is required.';errEl.style.display='block';return;}
+      if(!phone){errEl.textContent='Phone number is required.';errEl.style.display='block';return;}
+
+      const today=todayStr();
+      const list=(state.waitlist||[]).filter(w=>w.date===today);
+      const nextNum=list.length?Math.max(...list.map(w=>w.num||0))+1:1;
+
+      const btn=document.getElementById('wl-add-btn');
+      btn.innerHTML='<span class="spinner"></span>Adding…'; btn.disabled=true;
+
+      try{
+        await addDoc(collection(db,'waitlist'),{
+          name, phone, guests:parseInt(guests)||1, eta,
+          num:nextNum, date:today, seated:false,
+          createdAt:serverTimestamp(), createdBy:state.user.email
+        });
+        // Send WhatsApp to guest
+        sendWaitlistWhatsApp({name,phone,num:nextNum,guests,eta});
+        showToast(`${name} added as #${nextNum} ✅`);
+        openWaitlist();
+      }catch(e){
+        console.error(e);
+        errEl.textContent='Error adding to waitlist.';
+        errEl.style.display='block';
+        btn.textContent=`Add to waitlist — #${nextNum}`;
+        btn.disabled=false;
+      }
+    }
+
+    function sendWaitlistWhatsApp(w){
+      let phone=w.phone.replace(/[\s\-\(\)]/g,'');
+      if(!phone.startsWith('+')) phone='91'+phone.replace(/^0/,'');
+      else phone=phone.replace('+','');
+
+      const msg=[
+        `Hi ${w.name}! 👋`,
+        ``,
+        `You're on the waitlist at *Gossip Artisan Bakery & Cafe*.`,
+        ``,
+        `🪑 *Waitlist number:* #${w.num}`,
+        `👥 *Table for:* ${w.guests||1} guests`,
+        `⏱ *Estimated wait:* ${w.eta||'20-30 mins'}`,
+        ``,
+        `We'll seat you as soon as your table is ready. Thank you for your patience! 🥐`,
+        `— Team Gossip`,
+      ].join('\n');
+
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
     }
 
     // ── USER MANAGEMENT ──
