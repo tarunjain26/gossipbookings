@@ -10,7 +10,7 @@
     // ── Auto-update checker ──────────────────────────────────
     // Change this version number every time you deploy a new update
     // e.g. '1.0' → '1.1' → '1.2' etc.
-    const APP_VERSION = '1.2';
+    const APP_VERSION = '1.4';
 
     const stored = localStorage.getItem('gossip_app_version');
     if (stored && stored !== APP_VERSION) {
@@ -812,7 +812,7 @@
               <div class="cake-meta">${dateStr} ${c.cakeTime||''} · ${esc(c.flavour)} · ${esc(c.size)}</div>
               <div class="cake-extra">${locationInfo}</div>
               <div class="cake-extra">📞 ${esc(c.phone||'')} ${c.notes?' · '+esc(c.notes):''}</div>
-              <div class="cake-extra">💰 Rate: ₹${c.rate||0} · Advance: ₹${c.advance||0} (${c.paymentMode||'—'})</div>
+              <div class="cake-extra">💰 Rate: ₹${c.rate||0}${c.discount&&c.discount!=='0'?' · Discount: ₹'+c.discount:''}${c.deliveryType==='Delivery'&&c.deliveryCharge&&c.deliveryCharge!=='0'?' · Delivery: ₹'+c.deliveryCharge:''} · Advance: ₹${c.advance||0} (${c.paymentMode||'—'})</div>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
               <button class="btn-edit cake-edit-btn" data-id="${c.id}" style="font-size:12px;padding:4px 12px">Edit</button>
@@ -838,7 +838,7 @@
 
     function openCakeModal(mode, id=null){
       const c = mode==='edit' ? state.cakes.find(x=>x.id===id) : {
-        name:'',phone:'',cakeDate:todayStr(),cakeTime:'',flavour:CAKE_FLAVOURS[0],size:CAKE_SIZES[0],
+        name:'',phone:'',cakeDate:todayStr(),cakeTime:'',flavour:'',size:'',
         customNotes:'',deliveryType:'Pickup',deliveryAddress:'',pickupLocation:PICKUP_LOCATIONS[0],
         rate:'',advance:'',paymentMode:'Cash',designImage:''
       };
@@ -864,12 +864,14 @@
           <div><label class="fl">Date *</label><input type="date" id="ck-date" value="${f.cakeDate||''}"></div>
           <div><label class="fl">Time *</label><input type="time" id="ck-time" value="${f.cakeTime||''}"></div>
           <div><label class="fl">Size</label>
-            <select id="ck-size">${CAKE_SIZES.map(s=>`<option ${f.size===s?'selected':''}>${s}</option>`).join('')}</select>
+            <input id="ck-size" list="ck-size-options" value="${esc(f.size||'')}" placeholder="e.g. 1 kg">
+            <datalist id="ck-size-options">${CAKE_SIZES.map(s=>`<option value="${s}">`).join('')}</datalist>
           </div>
         </div>
         <div class="field-row">
           <div><label class="fl">Flavour</label>
-            <select id="ck-flavour">${CAKE_FLAVOURS.map(fl=>`<option ${f.flavour===fl?'selected':''}>${fl}</option>`).join('')}</select>
+            <input id="ck-flavour" list="ck-flavour-options" value="${esc(f.flavour||'')}" placeholder="e.g. Chocolate Truffle">
+            <datalist id="ck-flavour-options">${CAKE_FLAVOURS.map(fl=>`<option value="${fl}">`).join('')}</datalist>
           </div>
           <div><label class="fl">Rate quoted (₹)</label><input id="ck-rate" type="number" min="0" value="${f.rate||''}" placeholder="0"></div>
         </div>
@@ -897,12 +899,17 @@
         <div class="sec">Payment</div>
         <div class="field-row">
           <div><label class="fl">Advance received (₹)</label><input id="ck-advance" type="number" min="0" value="${f.advance||''}" placeholder="0"></div>
+          <div><label class="fl">Discount (₹)</label><input id="ck-discount" type="number" min="0" value="${f.discount||''}" placeholder="0"></div>
+        </div>
+        <div class="field-row">
           <div><label class="fl">Payment mode</label>
-            <div class="toggle-group" style="max-width:200px">
+            <div class="toggle-group" style="max-width:240px">
               <button type="button" class="toggle-btn ${f.paymentMode==='Cash'?'on':''}" id="ck-cash-btn">Cash</button>
               <button type="button" class="toggle-btn ${f.paymentMode==='UPI'?'on':''}" id="ck-upi-btn">UPI</button>
+              <button type="button" class="toggle-btn ${f.paymentMode==='COD'?'on':''}" id="ck-cod-btn">COD</button>
             </div>
           </div>
+          ${isDelivery?`<div><label class="fl">Delivery charges (₹)</label><input id="ck-delivery-charge" type="number" min="0" value="${f.deliveryCharge||''}" placeholder="0"></div>`:''}
         </div>
 
         <div class="sec">Cake design</div>
@@ -922,6 +929,7 @@
       document.getElementById('ck-delivery-btn').addEventListener('click',()=>{ syncCakeForm(); state.cakeForm.deliveryType='Delivery'; renderCakeModalBody(); });
       document.getElementById('ck-cash-btn').addEventListener('click',()=>{ syncCakeForm(); state.cakeForm.paymentMode='Cash'; renderCakeModalBody(); });
       document.getElementById('ck-upi-btn').addEventListener('click',()=>{ syncCakeForm(); state.cakeForm.paymentMode='UPI'; renderCakeModalBody(); });
+      document.getElementById('ck-cod-btn').addEventListener('click',()=>{ syncCakeForm(); state.cakeForm.paymentMode='COD'; renderCakeModalBody(); });
 
       document.getElementById('ck-design-file').addEventListener('change',e=>{
         const file=e.target.files[0];
@@ -948,6 +956,8 @@
         deliveryAddress:gv('ck-address')||state.cakeForm.deliveryAddress,
         pickupLocation:gv('ck-pickup-loc')||state.cakeForm.pickupLocation,
         advance:gv('ck-advance'),
+        discount:gv('ck-discount'),
+        deliveryCharge:gv('ck-delivery-charge')||state.cakeForm.deliveryCharge,
       };
     }
 
@@ -970,6 +980,7 @@
         flavour:f.flavour, size:f.size, customNotes:f.customNotes||'',
         deliveryType:f.deliveryType, deliveryAddress:f.deliveryAddress||'',
         pickupLocation:f.pickupLocation||'', rate:f.rate||'0', advance:f.advance||'0',
+        discount:f.discount||'0', deliveryCharge:f.deliveryCharge||'0',
         paymentMode:f.paymentMode||'Cash', designImage:f.designImage||'',
         updatedAt:new Date().toISOString(), updatedBy:state.user.email
       };
@@ -1020,6 +1031,8 @@
           ? `🚚 *Delivery to:* ${c.deliveryAddress}`
           : `🏬 *Pickup from:* ${c.pickupLocation}`,
         `💰 *Rate:* ₹${c.rate||0}`,
+        c.discount&&c.discount!=='0' ? `🏷️ *Discount:* ₹${c.discount}` : null,
+        c.deliveryType==='Delivery'&&c.deliveryCharge&&c.deliveryCharge!=='0' ? `🚛 *Delivery charges:* ₹${c.deliveryCharge}` : null,
         c.advance&&c.advance!=='0' ? `✅ *Advance received:* ₹${c.advance} (${c.paymentMode})` : null,
         ``,
         `Thank you for ordering with us! 🥰`,
@@ -1045,7 +1058,7 @@
         c.deliveryType==='Delivery'
           ? `🚚 *Delivery to:* ${c.deliveryAddress}`
           : `🏬 *Pickup from:* ${c.pickupLocation}`,
-        `💰 *Rate:* ₹${c.rate||0}  ·  Advance: ₹${c.advance||0} (${c.paymentMode||'—'})`,
+        `💰 *Rate:* ₹${c.rate||0}${c.discount&&c.discount!=='0'?'  ·  Discount: ₹'+c.discount:''}${c.deliveryType==='Delivery'&&c.deliveryCharge&&c.deliveryCharge!=='0'?'  ·  Delivery: ₹'+c.deliveryCharge:''}  ·  Advance: ₹${c.advance||0} (${c.paymentMode||'—'})`,
       ].filter(l=>l!==null).join('\n');
     }
 
