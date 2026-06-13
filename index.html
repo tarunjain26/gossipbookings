@@ -10,7 +10,7 @@
     // ── Auto-update checker ──────────────────────────────────
     // Change this version number every time you deploy a new update
     // e.g. '1.0' → '1.1' → '1.2' etc.
-    const APP_VERSION = '1.4';
+    const APP_VERSION = '1.5';
 
     const stored = localStorage.getItem('gossip_app_version');
     if (stored && stored !== APP_VERSION) {
@@ -812,7 +812,7 @@
               <div class="cake-meta">${dateStr} ${c.cakeTime||''} · ${esc(c.flavour)} · ${esc(c.size)}</div>
               <div class="cake-extra">${locationInfo}</div>
               <div class="cake-extra">📞 ${esc(c.phone||'')} ${c.notes?' · '+esc(c.notes):''}</div>
-              <div class="cake-extra">💰 Rate: ₹${c.rate||0}${c.discount&&c.discount!=='0'?' · Discount: ₹'+c.discount:''}${c.deliveryType==='Delivery'&&c.deliveryCharge&&c.deliveryCharge!=='0'?' · Delivery: ₹'+c.deliveryCharge:''} · Advance: ₹${c.advance||0} (${c.paymentMode||'—'})</div>
+              <div class="cake-extra">💰 Rate: ₹${c.rate||0}${c.discount&&c.discount!=='0'?' · Discount: '+c.discount+'%':''}${c.deliveryType==='Delivery'&&c.deliveryCharge&&c.deliveryCharge!=='0'?' · Delivery: ₹'+c.deliveryCharge:''} · Advance: ₹${c.advance||0} (${c.paymentMode||'—'})</div>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
               <button class="btn-edit cake-edit-btn" data-id="${c.id}" style="font-size:12px;padding:4px 12px">Edit</button>
@@ -899,7 +899,7 @@
         <div class="sec">Payment</div>
         <div class="field-row">
           <div><label class="fl">Advance received (₹)</label><input id="ck-advance" type="number" min="0" value="${f.advance||''}" placeholder="0"></div>
-          <div><label class="fl">Discount (₹)</label><input id="ck-discount" type="number" min="0" value="${f.discount||''}" placeholder="0"></div>
+          <div><label class="fl">Discount (%)</label><input id="ck-discount" type="number" min="0" max="100" value="${f.discount||''}" placeholder="0"></div>
         </div>
         <div class="field-row">
           <div><label class="fl">Payment mode</label>
@@ -1031,7 +1031,7 @@
           ? `🚚 *Delivery to:* ${c.deliveryAddress}`
           : `🏬 *Pickup from:* ${c.pickupLocation}`,
         `💰 *Rate:* ₹${c.rate||0}`,
-        c.discount&&c.discount!=='0' ? `🏷️ *Discount:* ₹${c.discount}` : null,
+        c.discount&&c.discount!=='0' ? `🏷️ *Discount:* ${c.discount}%` : null,
         c.deliveryType==='Delivery'&&c.deliveryCharge&&c.deliveryCharge!=='0' ? `🚛 *Delivery charges:* ₹${c.deliveryCharge}` : null,
         c.advance&&c.advance!=='0' ? `✅ *Advance received:* ₹${c.advance} (${c.paymentMode})` : null,
         ``,
@@ -1058,7 +1058,7 @@
         c.deliveryType==='Delivery'
           ? `🚚 *Delivery to:* ${c.deliveryAddress}`
           : `🏬 *Pickup from:* ${c.pickupLocation}`,
-        `💰 *Rate:* ₹${c.rate||0}${c.discount&&c.discount!=='0'?'  ·  Discount: ₹'+c.discount:''}${c.deliveryType==='Delivery'&&c.deliveryCharge&&c.deliveryCharge!=='0'?'  ·  Delivery: ₹'+c.deliveryCharge:''}  ·  Advance: ₹${c.advance||0} (${c.paymentMode||'—'})`,
+        `💰 *Rate:* ₹${c.rate||0}${c.discount&&c.discount!=='0'?'  ·  Discount: '+c.discount+'%':''}${c.deliveryType==='Delivery'&&c.deliveryCharge&&c.deliveryCharge!=='0'?'  ·  Delivery: ₹'+c.deliveryCharge:''}  ·  Advance: ₹${c.advance||0} (${c.paymentMode||'—'})`,
       ].filter(l=>l!==null).join('\n');
     }
 
