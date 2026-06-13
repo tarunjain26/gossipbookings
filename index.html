@@ -10,7 +10,7 @@
     // ── Auto-update checker ──────────────────────────────────
     // Change this version number every time you deploy a new update
     // e.g. '1.0' → '1.1' → '1.2' etc.
-    const APP_VERSION = '1.0';
+    const APP_VERSION = '1.2';
 
     const stored = localStorage.getItem('gossip_app_version');
     if (stored && stored !== APP_VERSION) {
@@ -185,6 +185,15 @@
     .waitlist-eta{font-size:12px;font-weight:600;color:var(--coral);margin-top:3px;}
     .waitlist-seated{opacity:.5;text-decoration:line-through;}
     .wl-modal{background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--gray-200);padding:1.5rem;width:520px;max-width:96vw;margin:auto;}
+    .cake-card{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:10px;}
+    .cake-card-top{display:flex;align-items:flex-start;gap:12px;}
+    .cake-thumb{width:56px;height:56px;border-radius:var(--radius-md);object-fit:cover;flex-shrink:0;border:1px solid var(--gray-200);background:var(--gray-100);}
+    .cake-thumb-placeholder{width:56px;height:56px;border-radius:var(--radius-md);flex-shrink:0;background:var(--coral-light);display:flex;align-items:center;justify-content:center;font-size:24px;}
+    .cake-info{flex:1;min-width:0;}
+    .cake-name{font-weight:600;font-size:15px;color:var(--black);}
+    .cake-meta{font-size:12px;color:var(--gray-600);margin-top:2px;}
+    .cake-extra{font-size:11px;color:var(--gray-400);margin-top:2px;}
+    .upload-preview{max-width:120px;max-height:120px;border-radius:var(--radius-md);border:1px solid var(--gray-200);margin-top:8px;display:block;}
     .user-table th{font-size:11px;font-weight:700;color:var(--gray-600);text-transform:uppercase;letter-spacing:.05em;padding:6px 10px;border-bottom:1px solid var(--gray-200);text-align:left;}
     .user-table td{padding:9px 10px;border-bottom:1px solid var(--gray-100);font-size:13px;vertical-align:middle;}
     .user-table tr:last-child td{border-bottom:none;}
@@ -243,6 +252,7 @@
         <div class="tabs">
           <button class="tab-btn active" data-view="calendar">Calendar</button>
           <button class="tab-btn" data-view="list">List view</button>
+          <button class="tab-btn" data-view="cakes">🎂 Cake orders</button>
         </div>
         <div class="action-right">
           <div id="list-filter" style="display:none">
@@ -255,6 +265,7 @@
             </select>
           </div>
           <button class="btn-coral" id="new-btn">+ New booking</button>
+          <button class="btn-coral" id="new-cake-btn" style="display:none;background:#F05A35">+ New cake order</button>
         </div>
       </div>
 
@@ -277,6 +288,9 @@
           </div>
           <div id="view-list" style="display:none">
             <div id="list-container"></div>
+          </div>
+          <div id="view-cakes" style="display:none">
+            <div id="cakes-container"></div>
           </div>
         </div>
 
@@ -358,10 +372,10 @@
     const ROLES         = {admin:'Admin',manager:'Manager',staff:'Staff'};
 
     let state = {
-      user:null, userRole:null, bookings:[], notes:[], users:[], waitlist:[],
+      user:null, userRole:null, bookings:[], notes:[], users:[], waitlist:[], cakes:[],
       view:'calendar', month:new Date().getMonth(), year:new Date().getFullYear(),
       selectedDate:null, modalMode:null, editBookingId:null, formData:{},
-      unsubBookings:null, unsubNotes:null, unsubUsers:null, unsubWaitlist:null,
+      unsubBookings:null, unsubNotes:null, unsubUsers:null, unsubWaitlist:null, unsubCakes:null,
     };
 
     // ── UTILS ──
@@ -414,7 +428,7 @@
         startListeners(); renderCalendar(); renderTodayPanel();
       } else {
         state.user=null;
-        [state.unsubBookings,state.unsubNotes,state.unsubUsers,state.unsubWaitlist].forEach(u=>u&&u());
+        [state.unsubBookings,state.unsubNotes,state.unsubUsers,state.unsubWaitlist,state.unsubCakes].forEach(u=>u&&u());
         document.getElementById('login-screen').style.display='flex';
         document.getElementById('main-app').style.display='none';
         document.getElementById('login-btn').textContent='Sign in';
@@ -449,6 +463,15 @@
       state.unsubWaitlist=onSnapshot(
         query(collection(db,'waitlist'),orderBy('createdAt','asc')),
         snap=>{ state.waitlist=snap.docs.map(d=>({id:d.id,...d.data()})).filter(w=>w.date===today); }
+      );
+
+      if(state.unsubCakes) state.unsubCakes();
+      state.unsubCakes=onSnapshot(
+        query(collection(db,'cakes'),orderBy('cakeDate','asc')),
+        snap=>{
+          state.cakes=snap.docs.map(d=>({id:d.id,...d.data()}));
+          if(state.view==='cakes') renderCakes();
+        }
       );
     }
 
@@ -513,8 +536,13 @@
         btn.classList.add('active'); state.view=btn.dataset.view;
         document.getElementById('view-calendar').style.display=state.view==='calendar'?'block':'none';
         document.getElementById('view-list').style.display=state.view==='list'?'block':'none';
+        document.getElementById('view-cakes').style.display=state.view==='cakes'?'block':'none';
         document.getElementById('list-filter').style.display=state.view==='list'?'flex':'none';
-        if(state.view==='calendar') renderCalendar(); else renderList();
+        document.getElementById('new-btn').style.display=state.view==='cakes'?'none':'inline-block';
+        document.getElementById('new-cake-btn').style.display=state.view==='cakes'?'inline-block':'none';
+        if(state.view==='calendar') renderCalendar();
+        else if(state.view==='list') renderList();
+        else renderCakes();
       });
     });
     document.getElementById('filter-type').addEventListener('change',renderList);
@@ -758,6 +786,295 @@
 
       const url = `https://wa.me/${phone}?text=${encodeURIComponent(lines)}`;
       window.open(url, '_blank');
+    }
+
+    // ── CAKE ORDERS ─────────────────────────────────────────
+    const CAKE_FLAVOURS = ['Chocolate Truffle','Vanilla','Red Velvet','Black Forest','Butterscotch','Pineapple','Coffee','Mango','Strawberry','Blueberry','Lotus Biscoff','Ferrero Rocher','Other'];
+    const CAKE_SIZES = ['0.5 kg','1 kg','1.5 kg','2 kg','3 kg','4 kg','5 kg','Other'];
+    const PICKUP_LOCATIONS = ['Aerodrome','Talwandi','Road No. 1'];
+
+    document.getElementById('new-cake-btn').addEventListener('click',()=>openCakeModal('new'));
+
+    function renderCakes(){
+      const container=document.getElementById('cakes-container');
+      const list=[...state.cakes].sort((a,b)=>(a.cakeDate||'').localeCompare(b.cakeDate||''));
+      if(!list.length){ container.innerHTML='<div class="list-empty">No cake orders yet. Click "+ New cake order" to add one.</div>'; return; }
+      container.innerHTML=list.map(c=>{
+        const dt=c.cakeDate?new Date(c.cakeDate):null;
+        const dateStr=dt?dt.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'';
+        const locationInfo = c.deliveryType==='Delivery' ? `🚚 ${esc(c.deliveryAddress||'')}` : `🏬 Pickup: ${esc(c.pickupLocation||'')}`;
+        return `
+        <div class="cake-card">
+          <div class="cake-card-top">
+            ${c.designImage?`<img src="${c.designImage}" class="cake-thumb" alt="cake design">`:`<div class="cake-thumb-placeholder">🎂</div>`}
+            <div class="cake-info">
+              <div class="cake-name">${esc(c.name)}</div>
+              <div class="cake-meta">${dateStr} ${c.cakeTime||''} · ${esc(c.flavour)} · ${esc(c.size)}</div>
+              <div class="cake-extra">${locationInfo}</div>
+              <div class="cake-extra">📞 ${esc(c.phone||'')} ${c.notes?' · '+esc(c.notes):''}</div>
+              <div class="cake-extra">💰 Rate: ₹${c.rate||0} · Advance: ₹${c.advance||0} (${c.paymentMode||'—'})</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+              <button class="btn-edit cake-edit-btn" data-id="${c.id}" style="font-size:12px;padding:4px 12px">Edit</button>
+              ${c.phone?`<button class="btn-whatsapp cake-wa-btn" data-id="${c.id}" style="font-size:12px;padding:4px 10px;background:#25D366;color:#fff;border-radius:8px;font-weight:500">WhatsApp customer</button>`:''}
+              <button class="btn-whatsapp cake-team-btn" data-id="${c.id}" style="font-size:12px;padding:4px 10px;background:#128C7E;color:#fff;border-radius:8px;font-weight:500">Send to cake team</button>
+              ${state.userRole==='admin'?`<button class="btn-del cake-del-btn" data-id="${c.id}" style="font-size:12px;padding:4px 12px">Delete</button>`:''}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+
+      container.querySelectorAll('.cake-edit-btn').forEach(b=>b.addEventListener('click',()=>openCakeModal('edit',b.dataset.id)));
+      container.querySelectorAll('.cake-del-btn').forEach(b=>b.addEventListener('click',()=>deleteCake(b.dataset.id)));
+      container.querySelectorAll('.cake-wa-btn').forEach(b=>{
+        const c=state.cakes.find(x=>x.id===b.dataset.id);
+        if(c) b.addEventListener('click',()=>sendCakeWhatsApp(c));
+      });
+      container.querySelectorAll('.cake-team-btn').forEach(b=>{
+        const c=state.cakes.find(x=>x.id===b.dataset.id);
+        if(c) b.addEventListener('click',()=>shareCakeWithTeam(c));
+      });
+    }
+
+    function openCakeModal(mode, id=null){
+      const c = mode==='edit' ? state.cakes.find(x=>x.id===id) : {
+        name:'',phone:'',cakeDate:todayStr(),cakeTime:'',flavour:CAKE_FLAVOURS[0],size:CAKE_SIZES[0],
+        customNotes:'',deliveryType:'Pickup',deliveryAddress:'',pickupLocation:PICKUP_LOCATIONS[0],
+        rate:'',advance:'',paymentMode:'Cash',designImage:''
+      };
+      state.cakeModalMode=mode; state.cakeId=id; state.cakeForm={...c};
+
+      document.getElementById('modal-title').textContent = mode==='new' ? '🎂 New cake order' : '🎂 Edit cake order';
+      renderCakeModalBody();
+      document.getElementById('modal-overlay').style.display='flex';
+    }
+
+    function renderCakeModalBody(){
+      const f=state.cakeForm;
+      const isDelivery = f.deliveryType==='Delivery';
+      document.getElementById('modal-body').innerHTML=`
+        <div class="sec">Customer details</div>
+        <div class="field-row">
+          <div><label class="fl">Name *</label><input id="ck-name" value="${esc(f.name||'')}" placeholder="Customer name"></div>
+          <div><label class="fl">Mobile number *</label><input id="ck-phone" value="${esc(f.phone||'')}" placeholder="+91 xxxxx xxxxx" type="tel"></div>
+        </div>
+
+        <div class="sec">Cake required</div>
+        <div class="field-row triple">
+          <div><label class="fl">Date *</label><input type="date" id="ck-date" value="${f.cakeDate||''}"></div>
+          <div><label class="fl">Time *</label><input type="time" id="ck-time" value="${f.cakeTime||''}"></div>
+          <div><label class="fl">Size</label>
+            <select id="ck-size">${CAKE_SIZES.map(s=>`<option ${f.size===s?'selected':''}>${s}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div><label class="fl">Flavour</label>
+            <select id="ck-flavour">${CAKE_FLAVOURS.map(fl=>`<option ${f.flavour===fl?'selected':''}>${fl}</option>`).join('')}</select>
+          </div>
+          <div><label class="fl">Rate quoted (₹)</label><input id="ck-rate" type="number" min="0" value="${f.rate||''}" placeholder="0"></div>
+        </div>
+
+        <div class="sec">Customisation notes</div>
+        <div class="field-row single">
+          <textarea id="ck-notes" rows="4" style="min-height:90px;resize:vertical" placeholder="Message on cake, theme, colours, toppers, allergies etc...">${esc(f.customNotes||'')}</textarea>
+        </div>
+
+        <div class="sec">Delivery or pickup</div>
+        <label class="fl">Type</label>
+        <div class="toggle-group" style="max-width:240px;margin-bottom:12px">
+          <button type="button" class="toggle-btn ${!isDelivery?'on':''}" id="ck-pickup-btn">Pickup</button>
+          <button type="button" class="toggle-btn ${isDelivery?'on':''}" id="ck-delivery-btn">Delivery</button>
+        </div>
+        <div id="ck-location-wrap">
+          ${isDelivery
+            ? `<div class="field-row single"><div><label class="fl">Delivery address *</label><textarea id="ck-address" rows="2" placeholder="Full delivery address">${esc(f.deliveryAddress||'')}</textarea></div></div>`
+            : `<div class="field-row single"><div><label class="fl">Pickup location</label>
+                 <select id="ck-pickup-loc">${PICKUP_LOCATIONS.map(l=>`<option ${f.pickupLocation===l?'selected':''}>${l}</option>`).join('')}</select>
+               </div></div>`
+          }
+        </div>
+
+        <div class="sec">Payment</div>
+        <div class="field-row">
+          <div><label class="fl">Advance received (₹)</label><input id="ck-advance" type="number" min="0" value="${f.advance||''}" placeholder="0"></div>
+          <div><label class="fl">Payment mode</label>
+            <div class="toggle-group" style="max-width:200px">
+              <button type="button" class="toggle-btn ${f.paymentMode==='Cash'?'on':''}" id="ck-cash-btn">Cash</button>
+              <button type="button" class="toggle-btn ${f.paymentMode==='UPI'?'on':''}" id="ck-upi-btn">UPI</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec">Cake design</div>
+        <input type="file" id="ck-design-file" accept="image/*" style="padding:6px">
+        <div id="ck-design-preview">${f.designImage?`<img src="${f.designImage}" class="upload-preview" alt="design preview">`:''}</div>
+
+        <div id="ck-error" class="error-msg" style="display:none;margin-top:12px"></div>
+
+        <div class="modal-footer">
+          <button class="btn-ghost" id="ck-cancel">Cancel</button>
+          <button class="btn-coral" id="ck-save" style="padding:8px 22px">Save cake order</button>
+        </div>`;
+
+      // Bindings
+      document.getElementById('ck-cancel').addEventListener('click',closeModal);
+      document.getElementById('ck-pickup-btn').addEventListener('click',()=>{ syncCakeForm(); state.cakeForm.deliveryType='Pickup'; renderCakeModalBody(); });
+      document.getElementById('ck-delivery-btn').addEventListener('click',()=>{ syncCakeForm(); state.cakeForm.deliveryType='Delivery'; renderCakeModalBody(); });
+      document.getElementById('ck-cash-btn').addEventListener('click',()=>{ syncCakeForm(); state.cakeForm.paymentMode='Cash'; renderCakeModalBody(); });
+      document.getElementById('ck-upi-btn').addEventListener('click',()=>{ syncCakeForm(); state.cakeForm.paymentMode='UPI'; renderCakeModalBody(); });
+
+      document.getElementById('ck-design-file').addEventListener('change',e=>{
+        const file=e.target.files[0];
+        if(!file) return;
+        if(file.size > 1.5*1024*1024){ alert('Image too large. Please choose an image under 1.5MB.'); return; }
+        const reader=new FileReader();
+        reader.onload=ev=>{
+          state.cakeForm.designImage=ev.target.result;
+          document.getElementById('ck-design-preview').innerHTML=`<img src="${ev.target.result}" class="upload-preview" alt="design preview">`;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      document.getElementById('ck-save').addEventListener('click',saveCake);
+    }
+
+    function syncCakeForm(){
+      const gv=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
+      state.cakeForm={
+        ...state.cakeForm,
+        name:gv('ck-name'), phone:gv('ck-phone'), cakeDate:gv('ck-date'), cakeTime:gv('ck-time'),
+        size:gv('ck-size'), flavour:gv('ck-flavour'), rate:gv('ck-rate'),
+        customNotes:gv('ck-notes'),
+        deliveryAddress:gv('ck-address')||state.cakeForm.deliveryAddress,
+        pickupLocation:gv('ck-pickup-loc')||state.cakeForm.pickupLocation,
+        advance:gv('ck-advance'),
+      };
+    }
+
+    async function saveCake(){
+      syncCakeForm();
+      const f=state.cakeForm;
+      const errEl=document.getElementById('ck-error');
+      errEl.style.display='none';
+      if(!f.name){errEl.textContent='Customer name is required.';errEl.style.display='block';return;}
+      if(!f.phone){errEl.textContent='Mobile number is required.';errEl.style.display='block';return;}
+      if(!f.cakeDate){errEl.textContent='Date is required.';errEl.style.display='block';return;}
+      if(!f.cakeTime){errEl.textContent='Time is required.';errEl.style.display='block';return;}
+      if(f.deliveryType==='Delivery' && !f.deliveryAddress){errEl.textContent='Delivery address is required.';errEl.style.display='block';return;}
+
+      const btn=document.getElementById('ck-save');
+      btn.innerHTML='<span class="spinner"></span>Saving…'; btn.disabled=true;
+
+      const data={
+        name:f.name, phone:f.phone, cakeDate:f.cakeDate, cakeTime:f.cakeTime,
+        flavour:f.flavour, size:f.size, customNotes:f.customNotes||'',
+        deliveryType:f.deliveryType, deliveryAddress:f.deliveryAddress||'',
+        pickupLocation:f.pickupLocation||'', rate:f.rate||'0', advance:f.advance||'0',
+        paymentMode:f.paymentMode||'Cash', designImage:f.designImage||'',
+        updatedAt:new Date().toISOString(), updatedBy:state.user.email
+      };
+
+      try{
+        if(state.cakeModalMode==='new'){
+          data.createdAt=new Date().toISOString(); data.createdBy=state.user.email;
+          await addDoc(collection(db,'cakes'),data);
+          showToast('Cake order saved!');
+        }else{
+          await updateDoc(doc(db,'cakes',state.cakeId),data);
+          showToast('Cake order updated!');
+        }
+        closeModal();
+        renderCakes();
+      }catch(e){
+        console.error(e);
+        errEl.textContent='Error saving cake order.'; errEl.style.display='block';
+        btn.textContent='Save cake order'; btn.disabled=false;
+      }
+    }
+
+    async function deleteCake(id){
+      if(!confirm('Delete this cake order?')) return;
+      try{ await deleteDoc(doc(db,'cakes',id)); showToast('Cake order deleted.'); renderCakes(); }
+      catch(e){ console.error(e); alert('Error deleting.'); }
+    }
+
+    function sendCakeWhatsApp(c){
+      let phone=c.phone.replace(/[\s\-\(\)]/g,'');
+      if(!phone.startsWith('+')) phone='91'+phone.replace(/^0/,'');
+      else phone=phone.replace('+','');
+
+      const dateObj=c.cakeDate?new Date(c.cakeDate+'T00:00:00'):null;
+      const niceDate=dateObj?dateObj.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'';
+
+      const lines=[
+        `Hi ${c.name}! 👋`,
+        ``,
+        `Your cake order with *Gossip Artisan Bakery & Cafe* is confirmed 🎂`,
+        ``,
+        `📅 *Date:* ${niceDate}`,
+        `⏰ *Time:* ${c.cakeTime}`,
+        `🍰 *Flavour:* ${c.flavour}`,
+        `⚖️ *Size:* ${c.size}`,
+        c.customNotes ? `📝 *Customisation:* ${c.customNotes}` : null,
+        c.deliveryType==='Delivery'
+          ? `🚚 *Delivery to:* ${c.deliveryAddress}`
+          : `🏬 *Pickup from:* ${c.pickupLocation}`,
+        `💰 *Rate:* ₹${c.rate||0}`,
+        c.advance&&c.advance!=='0' ? `✅ *Advance received:* ₹${c.advance} (${c.paymentMode})` : null,
+        ``,
+        `Thank you for ordering with us! 🥰`,
+        `— Team Gossip`,
+      ].filter(l=>l!==null).join('\n');
+
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(lines)}`,'_blank');
+    }
+
+    // Build an order summary for the cake-making team (internal use)
+    function buildCakeTeamMessage(c){
+      const dateObj=c.cakeDate?new Date(c.cakeDate+'T00:00:00'):null;
+      const niceDate=dateObj?dateObj.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'';
+      return [
+        `🎂 *New Cake Order*`,
+        ``,
+        `👤 *Customer:* ${c.name} (${c.phone})`,
+        `📅 *Date:* ${niceDate}`,
+        `⏰ *Time:* ${c.cakeTime}`,
+        `🍰 *Flavour:* ${c.flavour}`,
+        `⚖️ *Size:* ${c.size}`,
+        c.customNotes ? `📝 *Customisation:* ${c.customNotes}` : null,
+        c.deliveryType==='Delivery'
+          ? `🚚 *Delivery to:* ${c.deliveryAddress}`
+          : `🏬 *Pickup from:* ${c.pickupLocation}`,
+        `💰 *Rate:* ₹${c.rate||0}  ·  Advance: ₹${c.advance||0} (${c.paymentMode||'—'})`,
+      ].filter(l=>l!==null).join('\n');
+    }
+
+    // Share order details + design image with the cake-making team via WhatsApp
+    async function shareCakeWithTeam(c){
+      const text = buildCakeTeamMessage(c);
+
+      // If there's a design image and the device supports sharing files, share image + text together
+      if(c.designImage && navigator.canShare){
+        try{
+          const res = await fetch(c.designImage);
+          const blob = await res.blob();
+          const ext = blob.type.split('/')[1] || 'jpg';
+          const file = new File([blob], `cake-design-${c.id}.${ext}`, { type: blob.type });
+
+          if(navigator.canShare({ files:[file] })){
+            await navigator.share({ files:[file], text, title:'Cake order' });
+            return;
+          }
+        }catch(err){ console.warn('Share with image failed, falling back:', err); }
+      }
+
+      // Fallback: open WhatsApp with text only.
+      // If there's a design image, open it in a new tab too so staff can manually save & attach it.
+      if(c.designImage){
+        const imgWin = window.open(c.designImage, '_blank');
+        if(imgWin) showToast('Design image opened in a new tab — save & attach it in WhatsApp');
+      }
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
     }
 
     // ── WAITLIST ────────────────────────────────────────────
