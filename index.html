@@ -10,7 +10,7 @@
     // ── Auto-update checker ──────────────────────────────────
     // Change this version number every time you deploy a new update
     // e.g. '1.0' → '1.1' → '1.2' etc.
-    const APP_VERSION = '1.5';
+    const APP_VERSION = '1.6';
 
     const stored = localStorage.getItem('gossip_app_version');
     if (stored && stored !== APP_VERSION) {
@@ -849,92 +849,126 @@
       document.getElementById('modal-overlay').style.display='flex';
     }
 
+    function calcCakeTotals(f){
+      const rate    = parseFloat(f.rate||0);
+      const disc    = parseFloat(f.discount||0);
+      const gst     = parseFloat(f.gst||0);
+      const del     = f.deliveryType==='Delivery' ? parseFloat(f.deliveryCharge||0) : 0;
+      const adv     = parseFloat(f.advance||0);
+      const discAmt = rate * disc / 100;
+      const afterDisc = rate - discAmt;
+      const gstAmt  = afterDisc * gst / 100;
+      const total   = afterDisc + gstAmt + del;
+      const balance = total - adv;
+      return { discAmt, gstAmt, total, balance };
+    }
+
     function renderCakeModalBody(){
       const f=state.cakeForm;
       const isDelivery = f.deliveryType==='Delivery';
+      const t = calcCakeTotals(f);
       document.getElementById('modal-body').innerHTML=`
         <div class="sec">Customer details</div>
         <div class="field-row">
           <div><label class="fl">Name *</label><input id="ck-name" value="${esc(f.name||'')}" placeholder="Customer name"></div>
           <div><label class="fl">Mobile number *</label><input id="ck-phone" value="${esc(f.phone||'')}" placeholder="+91 xxxxx xxxxx" type="tel"></div>
         </div>
-
-        <div class="sec">Cake required</div>
-        <div class="field-row triple">
+        <div class="sec">Cake details</div>
+        <div class="field-row">
           <div><label class="fl">Date *</label><input type="date" id="ck-date" value="${f.cakeDate||''}"></div>
           <div><label class="fl">Time *</label><input type="time" id="ck-time" value="${f.cakeTime||''}"></div>
-          <div><label class="fl">Size</label>
+        </div>
+        <div class="field-row">
+          <div>
+            <label class="fl">Flavour</label>
+            <input id="ck-flavour" list="ck-flavour-options" value="${esc(f.flavour||'')}" placeholder="e.g. Chocolate Truffle">
+            <datalist id="ck-flavour-options">${CAKE_FLAVOURS.map(fl=>`<option value="${fl}">`).join('')}</datalist>
+          </div>
+          <div>
+            <label class="fl">Size</label>
             <input id="ck-size" list="ck-size-options" value="${esc(f.size||'')}" placeholder="e.g. 1 kg">
             <datalist id="ck-size-options">${CAKE_SIZES.map(s=>`<option value="${s}">`).join('')}</datalist>
           </div>
         </div>
-        <div class="field-row">
-          <div><label class="fl">Flavour</label>
-            <input id="ck-flavour" list="ck-flavour-options" value="${esc(f.flavour||'')}" placeholder="e.g. Chocolate Truffle">
-            <datalist id="ck-flavour-options">${CAKE_FLAVOURS.map(fl=>`<option value="${fl}">`).join('')}</datalist>
-          </div>
-          <div><label class="fl">Rate quoted (₹)</label><input id="ck-rate" type="number" min="0" value="${f.rate||''}" placeholder="0"></div>
-        </div>
-
-        <div class="sec">Customisation notes</div>
         <div class="field-row single">
-          <textarea id="ck-notes" rows="4" style="min-height:90px;resize:vertical" placeholder="Message on cake, theme, colours, toppers, allergies etc...">${esc(f.customNotes||'')}</textarea>
+          <div><label class="fl">Customisation notes</label>
+          <textarea id="ck-notes" rows="3" style="min-height:80px;resize:vertical" placeholder="Theme, colours, toppers, allergies etc...">${esc(f.customNotes||'')}</textarea></div>
         </div>
-
+        <div class="field-row single">
+          <div><label class="fl">Message on cake</label>
+          <input id="ck-message" value="${esc(f.cakeMessage||'')}" placeholder="e.g. Happy Birthday Priya!"></div>
+        </div>
         <div class="sec">Delivery or pickup</div>
         <label class="fl">Type</label>
         <div class="toggle-group" style="max-width:240px;margin-bottom:12px">
           <button type="button" class="toggle-btn ${!isDelivery?'on':''}" id="ck-pickup-btn">Pickup</button>
           <button type="button" class="toggle-btn ${isDelivery?'on':''}" id="ck-delivery-btn">Delivery</button>
         </div>
-        <div id="ck-location-wrap">
-          ${isDelivery
-            ? `<div class="field-row single"><div><label class="fl">Delivery address *</label><textarea id="ck-address" rows="2" placeholder="Full delivery address">${esc(f.deliveryAddress||'')}</textarea></div></div>`
-            : `<div class="field-row single"><div><label class="fl">Pickup location</label>
-                 <select id="ck-pickup-loc">${PICKUP_LOCATIONS.map(l=>`<option ${f.pickupLocation===l?'selected':''}>${l}</option>`).join('')}</select>
-               </div></div>`
-          }
+        ${isDelivery
+          ?`<div class="field-row single"><label class="fl">Delivery address *</label><textarea id="ck-address" rows="2" placeholder="Full delivery address">${esc(f.deliveryAddress||'')}</textarea></div>`
+          :`<div class="field-row single"><label class="fl">Pickup location</label>
+               <select id="ck-pickup-loc">${PICKUP_LOCATIONS.map(l=>`<option ${f.pickupLocation===l?'selected':''}>${l}</option>`).join('')}</select>
+             </div>`
+        }
+        <div class="sec">Pricing</div>
+        <div class="field-row triple">
+          <div><label class="fl">Rate (₹)</label><input id="ck-rate" type="number" min="0" value="${f.rate||''}" placeholder="0" oninput="window._cakeRecalc()"></div>
+          <div><label class="fl">Discount (%)</label><input id="ck-discount" type="number" min="0" max="100" value="${f.discount||''}" placeholder="0" oninput="window._cakeRecalc()"></div>
+          <div><label class="fl">GST (%)</label><input id="ck-gst" type="number" min="0" value="${f.gst||''}" placeholder="0" oninput="window._cakeRecalc()"></div>
         </div>
-
+        ${isDelivery?`<div class="field-row single"><label class="fl">Delivery charges (₹)</label><input id="ck-delivery-charge" type="number" min="0" value="${f.deliveryCharge||''}" placeholder="0" oninput="window._cakeRecalc()"></div>`:''}
+        <div style="background:#fafafa;border:1px solid var(--gray-200);border-radius:var(--radius-md);padding:12px;margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span style="color:var(--gray-600)">Discount amount</span><span>− ₹<span id="ck-disc-amt">${t.discAmt.toFixed(2)}</span></span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span style="color:var(--gray-600)">GST amount</span><span>+ ₹<span id="ck-gst-amt">${t.gstAmt.toFixed(2)}</span></span></div>
+          <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:var(--coral);border-top:1px solid var(--gray-200);padding-top:8px;margin-top:4px"><span>Total amount</span><span>₹<span id="ck-total-amt">${t.total.toFixed(2)}</span></span></div>
+        </div>
         <div class="sec">Payment</div>
         <div class="field-row">
-          <div><label class="fl">Advance received (₹)</label><input id="ck-advance" type="number" min="0" value="${f.advance||''}" placeholder="0"></div>
-          <div><label class="fl">Discount (%)</label><input id="ck-discount" type="number" min="0" max="100" value="${f.discount||''}" placeholder="0"></div>
-        </div>
-        <div class="field-row">
-          <div><label class="fl">Payment mode</label>
-            <div class="toggle-group" style="max-width:240px">
-              <button type="button" class="toggle-btn ${f.paymentMode==='Cash'?'on':''}" id="ck-cash-btn">Cash</button>
+          <div><label class="fl">Advance received (₹)</label><input id="ck-advance" type="number" min="0" value="${f.advance||''}" placeholder="0" oninput="window._cakeRecalc()"></div>
+          <div><label class="fl">Mode of payment</label>
+            <div class="toggle-group">
+              <button type="button" class="toggle-btn ${(f.paymentMode||'Cash')==='Cash'?'on':''}" id="ck-cash-btn">Cash</button>
               <button type="button" class="toggle-btn ${f.paymentMode==='UPI'?'on':''}" id="ck-upi-btn">UPI</button>
               <button type="button" class="toggle-btn ${f.paymentMode==='COD'?'on':''}" id="ck-cod-btn">COD</button>
             </div>
           </div>
-          ${isDelivery?`<div><label class="fl">Delivery charges (₹)</label><input id="ck-delivery-charge" type="number" min="0" value="${f.deliveryCharge||''}" placeholder="0"></div>`:''}
         </div>
-
+        <div style="display:flex;justify-content:space-between;align-items:center;background:#FCEBEB;border:1px solid var(--coral-mid);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:12px">
+          <span style="font-size:13px;font-weight:600;color:#791F1F">Balance to pay</span>
+          <span style="font-size:18px;font-weight:800;color:#C03A1A">₹<span id="ck-balance-amt">${t.balance.toFixed(2)}</span></span>
+        </div>
         <div class="sec">Cake design</div>
         <input type="file" id="ck-design-file" accept="image/*" style="padding:6px">
         <div id="ck-design-preview">${f.designImage?`<img src="${f.designImage}" class="upload-preview" alt="design preview">`:''}</div>
-
         <div id="ck-error" class="error-msg" style="display:none;margin-top:12px"></div>
-
         <div class="modal-footer">
           <button class="btn-ghost" id="ck-cancel">Cancel</button>
           <button class="btn-coral" id="ck-save" style="padding:8px 22px">Save cake order</button>
         </div>`;
 
-      // Bindings
+      window._cakeRecalc = () => {
+        const gv=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
+        const tt=calcCakeTotals({
+          rate:gv('ck-rate'), discount:gv('ck-discount'), gst:gv('ck-gst'),
+          advance:gv('ck-advance'), deliveryCharge:gv('ck-delivery-charge')||'0',
+          deliveryType:state.cakeForm.deliveryType
+        });
+        const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+        set('ck-disc-amt', tt.discAmt.toFixed(2));
+        set('ck-gst-amt',  tt.gstAmt.toFixed(2));
+        set('ck-total-amt',tt.total.toFixed(2));
+        set('ck-balance-amt', tt.balance.toFixed(2));
+      };
+
       document.getElementById('ck-cancel').addEventListener('click',closeModal);
       document.getElementById('ck-pickup-btn').addEventListener('click',()=>{ syncCakeForm(); state.cakeForm.deliveryType='Pickup'; renderCakeModalBody(); });
       document.getElementById('ck-delivery-btn').addEventListener('click',()=>{ syncCakeForm(); state.cakeForm.deliveryType='Delivery'; renderCakeModalBody(); });
       document.getElementById('ck-cash-btn').addEventListener('click',()=>{ syncCakeForm(); state.cakeForm.paymentMode='Cash'; renderCakeModalBody(); });
       document.getElementById('ck-upi-btn').addEventListener('click',()=>{ syncCakeForm(); state.cakeForm.paymentMode='UPI'; renderCakeModalBody(); });
       document.getElementById('ck-cod-btn').addEventListener('click',()=>{ syncCakeForm(); state.cakeForm.paymentMode='COD'; renderCakeModalBody(); });
-
       document.getElementById('ck-design-file').addEventListener('change',e=>{
-        const file=e.target.files[0];
-        if(!file) return;
-        if(file.size > 1.5*1024*1024){ alert('Image too large. Please choose an image under 1.5MB.'); return; }
+        const file=e.target.files[0]; if(!file) return;
+        if(file.size > 2*1024*1024){ alert('Image too large. Please choose under 2MB.'); return; }
         const reader=new FileReader();
         reader.onload=ev=>{
           state.cakeForm.designImage=ev.target.result;
@@ -942,7 +976,6 @@
         };
         reader.readAsDataURL(file);
       });
-
       document.getElementById('ck-save').addEventListener('click',saveCake);
     }
 
@@ -951,12 +984,12 @@
       state.cakeForm={
         ...state.cakeForm,
         name:gv('ck-name'), phone:gv('ck-phone'), cakeDate:gv('ck-date'), cakeTime:gv('ck-time'),
-        size:gv('ck-size'), flavour:gv('ck-flavour'), rate:gv('ck-rate'),
-        customNotes:gv('ck-notes'),
+        flavour:gv('ck-flavour'), size:gv('ck-size'),
+        customNotes:gv('ck-notes'), cakeMessage:gv('ck-message'),
+        rate:gv('ck-rate'), discount:gv('ck-discount'), gst:gv('ck-gst'),
+        advance:gv('ck-advance'),
         deliveryAddress:gv('ck-address')||state.cakeForm.deliveryAddress,
         pickupLocation:gv('ck-pickup-loc')||state.cakeForm.pickupLocation,
-        advance:gv('ck-advance'),
-        discount:gv('ck-discount'),
         deliveryCharge:gv('ck-delivery-charge')||state.cakeForm.deliveryCharge,
       };
     }
@@ -970,35 +1003,29 @@
       if(!f.phone){errEl.textContent='Mobile number is required.';errEl.style.display='block';return;}
       if(!f.cakeDate){errEl.textContent='Date is required.';errEl.style.display='block';return;}
       if(!f.cakeTime){errEl.textContent='Time is required.';errEl.style.display='block';return;}
-      if(f.deliveryType==='Delivery' && !f.deliveryAddress){errEl.textContent='Delivery address is required.';errEl.style.display='block';return;}
-
+      if(f.deliveryType==='Delivery'&&!f.deliveryAddress){errEl.textContent='Delivery address is required.';errEl.style.display='block';return;}
+      const t=calcCakeTotals(f);
       const btn=document.getElementById('ck-save');
       btn.innerHTML='<span class="spinner"></span>Saving…'; btn.disabled=true;
-
       const data={
         name:f.name, phone:f.phone, cakeDate:f.cakeDate, cakeTime:f.cakeTime,
-        flavour:f.flavour, size:f.size, customNotes:f.customNotes||'',
-        deliveryType:f.deliveryType, deliveryAddress:f.deliveryAddress||'',
-        pickupLocation:f.pickupLocation||'', rate:f.rate||'0', advance:f.advance||'0',
-        discount:f.discount||'0', deliveryCharge:f.deliveryCharge||'0',
+        flavour:f.flavour||'', size:f.size||'', customNotes:f.customNotes||'', cakeMessage:f.cakeMessage||'',
+        deliveryType:f.deliveryType, deliveryAddress:f.deliveryAddress||'', pickupLocation:f.pickupLocation||'',
+        rate:f.rate||'0', discount:f.discount||'0', gst:f.gst||'0', deliveryCharge:f.deliveryCharge||'0',
+        totalAmount:t.total.toFixed(2), advance:f.advance||'0', balance:t.balance.toFixed(2),
         paymentMode:f.paymentMode||'Cash', designImage:f.designImage||'',
         updatedAt:new Date().toISOString(), updatedBy:state.user.email
       };
-
       try{
         if(state.cakeModalMode==='new'){
           data.createdAt=new Date().toISOString(); data.createdBy=state.user.email;
-          await addDoc(collection(db,'cakes'),data);
-          showToast('Cake order saved!');
+          await addDoc(collection(db,'cakes'),data); showToast('Cake order saved!');
         }else{
-          await updateDoc(doc(db,'cakes',state.cakeId),data);
-          showToast('Cake order updated!');
+          await updateDoc(doc(db,'cakes',state.cakeId),data); showToast('Cake order updated!');
         }
-        closeModal();
-        renderCakes();
+        closeModal(); renderCakes();
       }catch(e){
-        console.error(e);
-        errEl.textContent='Error saving cake order.'; errEl.style.display='block';
+        console.error(e); errEl.textContent='Error saving cake order.'; errEl.style.display='block';
         btn.textContent='Save cake order'; btn.disabled=false;
       }
     }
@@ -1013,81 +1040,66 @@
       let phone=c.phone.replace(/[\s\-\(\)]/g,'');
       if(!phone.startsWith('+')) phone='91'+phone.replace(/^0/,'');
       else phone=phone.replace('+','');
-
       const dateObj=c.cakeDate?new Date(c.cakeDate+'T00:00:00'):null;
       const niceDate=dateObj?dateObj.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'';
-
       const lines=[
-        `Hi ${c.name}! 👋`,
-        ``,
-        `Your cake order with *Gossip Artisan Bakery & Cafe* is confirmed 🎂`,
-        ``,
+        `Hi ${c.name}! 👋`,``,
+        `Your cake order with *Gossip Artisan Bakery & Cafe* is confirmed 🎂`,``,
         `📅 *Date:* ${niceDate}`,
         `⏰ *Time:* ${c.cakeTime}`,
-        `🍰 *Flavour:* ${c.flavour}`,
-        `⚖️ *Size:* ${c.size}`,
-        c.customNotes ? `📝 *Customisation:* ${c.customNotes}` : null,
-        c.deliveryType==='Delivery'
-          ? `🚚 *Delivery to:* ${c.deliveryAddress}`
-          : `🏬 *Pickup from:* ${c.pickupLocation}`,
-        `💰 *Rate:* ₹${c.rate||0}`,
-        c.discount&&c.discount!=='0' ? `🏷️ *Discount:* ${c.discount}%` : null,
-        c.deliveryType==='Delivery'&&c.deliveryCharge&&c.deliveryCharge!=='0' ? `🚛 *Delivery charges:* ₹${c.deliveryCharge}` : null,
-        c.advance&&c.advance!=='0' ? `✅ *Advance received:* ₹${c.advance} (${c.paymentMode})` : null,
-        ``,
-        `Thank you for ordering with us! 🥰`,
-        `— Team Gossip`,
+        c.flavour?`🍰 *Flavour:* ${c.flavour}`:null,
+        c.size?`⚖️ *Size:* ${c.size}`:null,
+        c.customNotes?`📝 *Customisation:* ${c.customNotes}`:null,
+        c.cakeMessage?`✍️ *Message on cake:* ${c.cakeMessage}`:null,
+        c.deliveryType==='Delivery'?`🚚 *Delivery to:* ${c.deliveryAddress}`:`🏬 *Pickup from:* ${c.pickupLocation}`,``,
+        `💰 *Total amount:* ₹${c.totalAmount||c.rate||0}`,
+        c.advance&&c.advance!=='0'?`✅ *Advance paid:* ₹${c.advance}`:null,
+        c.balance&&parseFloat(c.balance)>0?`🔔 *Balance to pay:* ₹${c.balance}`:null,``,
+        `Thank you for ordering with us! 🥰`,`— Team Gossip`,
       ].filter(l=>l!==null).join('\n');
-
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(lines)}`,'_blank');
     }
 
-    // Build an order summary for the cake-making team (internal use)
     function buildCakeTeamMessage(c){
       const dateObj=c.cakeDate?new Date(c.cakeDate+'T00:00:00'):null;
       const niceDate=dateObj?dateObj.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'';
       return [
-        `🎂 *New Cake Order*`,
-        ``,
-        `👤 *Customer:* ${c.name} (${c.phone})`,
+        `🎂 *Cake Order — Gossip*`,``,
+        `👤 *Name:* ${c.name}`,
+        `📞 *Number:* ${c.phone}`,
         `📅 *Date:* ${niceDate}`,
         `⏰ *Time:* ${c.cakeTime}`,
-        `🍰 *Flavour:* ${c.flavour}`,
-        `⚖️ *Size:* ${c.size}`,
-        c.customNotes ? `📝 *Customisation:* ${c.customNotes}` : null,
-        c.deliveryType==='Delivery'
-          ? `🚚 *Delivery to:* ${c.deliveryAddress}`
-          : `🏬 *Pickup from:* ${c.pickupLocation}`,
-        `💰 *Rate:* ₹${c.rate||0}${c.discount&&c.discount!=='0'?'  ·  Discount: '+c.discount+'%':''}${c.deliveryType==='Delivery'&&c.deliveryCharge&&c.deliveryCharge!=='0'?'  ·  Delivery: ₹'+c.deliveryCharge:''}  ·  Advance: ₹${c.advance||0} (${c.paymentMode||'—'})`,
+        c.flavour?`🍰 *Flavour:* ${c.flavour}`:null,
+        c.size?`⚖️ *Size:* ${c.size}`:null,
+        c.customNotes?`📝 *Customisation:* ${c.customNotes}`:null,
+        c.cakeMessage?`✍️ *Message on cake:* ${c.cakeMessage}`:null,
+        c.deliveryType==='Delivery'?`🚚 *Delivery to:* ${c.deliveryAddress}`:`🏬 *Pickup:* ${c.pickupLocation}`,``,
+        `💵 *Rate:* ₹${c.rate||0}`,
+        c.discount&&c.discount!=='0'?`🏷️ *Discount:* ${c.discount}%`:null,
+        c.gst&&c.gst!=='0'?`🧾 *GST:* ${c.gst}%`:null,
+        c.deliveryType==='Delivery'&&c.deliveryCharge&&c.deliveryCharge!=='0'?`🚛 *Delivery charges:* ₹${c.deliveryCharge}`:null,
+        `💰 *Total amount:* ₹${c.totalAmount||c.rate||0}`,
+        `✅ *Advance received:* ₹${c.advance||0} (${c.paymentMode||'—'})`,
+        `🔔 *Balance to pay:* ₹${c.balance||0}`,
       ].filter(l=>l!==null).join('\n');
     }
 
-    // Share order details + design image with the cake-making team via WhatsApp
     async function shareCakeWithTeam(c){
-      const text = buildCakeTeamMessage(c);
-
-      // If there's a design image and the device supports sharing files, share image + text together
+      const text=buildCakeTeamMessage(c);
       if(c.designImage && navigator.canShare){
         try{
-          const res = await fetch(c.designImage);
-          const blob = await res.blob();
-          const ext = blob.type.split('/')[1] || 'jpg';
-          const file = new File([blob], `cake-design-${c.id}.${ext}`, { type: blob.type });
-
-          if(navigator.canShare({ files:[file] })){
-            await navigator.share({ files:[file], text, title:'Cake order' });
+          const res=await fetch(c.designImage);
+          const blob=await res.blob();
+          const ext=blob.type.split('/')[1]||'jpg';
+          const file=new File([blob],`cake-design-${c.id}.${ext}`,{type:blob.type});
+          if(navigator.canShare({files:[file]})){
+            await navigator.share({files:[file],text,title:'Cake order'});
             return;
           }
-        }catch(err){ console.warn('Share with image failed, falling back:', err); }
+        }catch(err){ console.warn('Share fallback:',err); }
       }
-
-      // Fallback: open WhatsApp with text only.
-      // If there's a design image, open it in a new tab too so staff can manually save & attach it.
-      if(c.designImage){
-        const imgWin = window.open(c.designImage, '_blank');
-        if(imgWin) showToast('Design image opened in a new tab — save & attach it in WhatsApp');
-      }
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+      if(c.designImage){ window.open(c.designImage,'_blank'); showToast('Design image opened — save & attach in WhatsApp'); }
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank');
     }
 
     // ── WAITLIST ────────────────────────────────────────────
