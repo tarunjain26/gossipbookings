@@ -10,7 +10,7 @@
     // ── Auto-update checker ──────────────────────────────────
     // Change this version number every time you deploy a new update
     // e.g. '1.0' → '1.1' → '1.2' etc.
-    const APP_VERSION = '1.6';
+    const APP_VERSION = '1.7';
 
     const stored = localStorage.getItem('gossip_app_version');
     if (stored && stored !== APP_VERSION) {
@@ -797,8 +797,12 @@
 
     function renderCakes(){
       const container=document.getElementById('cakes-container');
-      const list=[...state.cakes].sort((a,b)=>(a.cakeDate||'').localeCompare(b.cakeDate||''));
-      if(!list.length){ container.innerHTML='<div class="list-empty">No cake orders yet. Click "+ New cake order" to add one.</div>'; return; }
+      const today=todayStr();
+      // Only show today's and future orders, sorted ascending (nearest date first)
+      const list=[...state.cakes]
+        .filter(c=>(c.cakeDate||'') >= today)
+        .sort((a,b)=>(a.cakeDate||'').localeCompare(b.cakeDate||'') || (a.cakeTime||'').localeCompare(b.cakeTime||''));
+      if(!list.length){ container.innerHTML='<div class="list-empty">No upcoming cake orders. Past orders are archived automatically.</div>'; return; }
       container.innerHTML=list.map(c=>{
         const dt=c.cakeDate?new Date(c.cakeDate):null;
         const dateStr=dt?dt.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'';
