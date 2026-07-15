@@ -10,7 +10,7 @@
     // ── Auto-update checker ──────────────────────────────────
     // Change this version number every time you deploy a new update
     // e.g. '1.0' → '1.1' → '1.2' etc.
-    const APP_VERSION = '1.7';
+    const APP_VERSION = '1.8';
 
     const stored = localStorage.getItem('gossip_app_version');
     if (stored && stored !== APP_VERSION) {
@@ -121,9 +121,9 @@
 
     .cal-nav{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
     .month-label{font-size:17px;font-weight:600;min-width:160px;text-align:center;color:var(--black);}
-    .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
-    .cal-header-cell{font-size:11px;color:#fff;text-align:center;padding:6px 0;font-weight:700;background:var(--coral);border-radius:4px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px;}
-    .cal-day{min-height:82px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:5px;cursor:pointer;background:var(--white);transition:border-color .15s,background .15s;}
+    .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;}
+    .cal-header-cell{font-size:11px;color:#fff;text-align:center;padding:6px 0;font-weight:700;background:var(--coral);border-radius:4px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:2px;min-width:0;overflow:hidden;}
+    .cal-day{min-height:82px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);padding:5px;cursor:pointer;background:var(--white);transition:border-color .15s,background .15s;min-width:0;overflow:hidden;}
     .cal-day:hover{border-color:var(--coral);background:var(--coral-pale);}
     .cal-day.other-month{background:var(--gray-50);opacity:.45;pointer-events:none;}
     .cal-day.today{border:2px solid var(--coral);}
