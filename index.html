@@ -10,7 +10,7 @@
     // ── Auto-update checker ──────────────────────────────────
     // Change this version number every time you deploy a new update
     // e.g. '1.0' → '1.1' → '1.2' etc.
-    const APP_VERSION = '1.8';
+    const APP_VERSION = '1.9';
 
     const stored = localStorage.getItem('gossip_app_version');
     if (stored && stored !== APP_VERSION) {
@@ -205,7 +205,7 @@
     @keyframes spin{to{transform:rotate(360deg);}}
 
     @media(max-width:900px){.app-body{grid-template-columns:1fr;}.sidebar{display:grid;grid-template-columns:1fr 1fr;gap:12px;}}
-    @media(max-width:640px){.field-row{grid-template-columns:1fr;}.field-row.triple{grid-template-columns:1fr 1fr;}.cal-event{font-size:9px;}.cal-day{min-height:56px;}.header-inner{flex-wrap:wrap;gap:8px;}.user-email{display:none;}.sidebar{grid-template-columns:1fr;}}
+    @media(max-width:640px){.field-row{grid-template-columns:1fr;}.field-row.triple{grid-template-columns:1fr 1fr;}.cal-event{font-size:9px;padding:2px 3px;}.ev-prefix{display:none;}.cal-day{min-height:56px;padding:3px;}.header-inner{flex-wrap:wrap;gap:8px;}.user-email{display:none;}.sidebar{grid-template-columns:1fr;}}
   </style>
 </head>
 <body>
@@ -570,7 +570,9 @@
         bks.slice(0,3).forEach(b=>{
           const ev=document.createElement('div');
           ev.className=`cal-event ${b.isEnquiry||b.type.startsWith('Enquiry')?'ev-enquiry':b.type==='Private Area'?'ev-private':'ev-table'}`;
-          ev.textContent=`${b.isEnquiry||b.type.startsWith('Enquiry')?'Enq':b.type==='Private Area'?'Pvt':'Tbl'} · ${b.name.split(' ')[0]}`;
+          const pfx=document.createElement('span'); pfx.className='ev-prefix';
+          pfx.textContent=`${b.isEnquiry||b.type.startsWith('Enquiry')?'Enq':b.type==='Private Area'?'Pvt':'Tbl'} · `;
+          ev.appendChild(pfx); ev.appendChild(document.createTextNode(b.name.split(' ')[0]));
           ev.dataset.bookingId=b.id;
           ev.addEventListener('click',e=>{ e.stopPropagation(); openViewModal(b.id); });
           cell.appendChild(ev);
