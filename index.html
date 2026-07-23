@@ -10,7 +10,7 @@
     // ── Auto-update checker ──────────────────────────────────
     // Change this version number every time you deploy a new update
     // e.g. '1.0' → '1.1' → '1.2' etc.
-    const APP_VERSION = '1.9';
+    const APP_VERSION = '2.0';
 
     const stored = localStorage.getItem('gossip_app_version');
     if (stored && stored !== APP_VERSION) {
@@ -394,6 +394,18 @@
         return f.fromTime<(b.toTime||'23:59')&&(f.toTime||'23:59')>b.fromTime;
       });
     }
+    // Minimum billing commitment: ₹4500 + 5% GST
+    const MIN_BILLING_BASE = 4500, MIN_BILLING_TOTAL = 4725;
+    // Warn when an enquiry overlaps an existing enquiry on the same date
+    function checkEnquiryConflict(f,excludeId=null){
+      if(!f.date||!f.fromTime||!f.toTime) return false;
+      return state.bookings.some(b=>{
+        if(!(b.isEnquiry||String(b.type||'').startsWith('Enquiry'))) return false;
+        if(b.date!==f.date) return false;
+        if(excludeId&&b.id===excludeId) return false;
+        return f.fromTime<(b.toTime||'23:59')&&(f.toTime||'23:59')>b.fromTime;
+      });
+    }
     function fmtTimestamp(ts){
       if(!ts) return '';
       const d=ts.toDate?ts.toDate():new Date(ts);
@@ -599,7 +611,7 @@
           <div class="list-info">
             <div class="list-name">${esc(b.name)}</div>
             <div class="list-meta">${b.date} · ${b.fromTime}–${b.toTime} · ${b.guests} guests · ${esc(b.event)}</div>
-            <div class="list-extra">${esc(b.menuChoice)}${b.decoration?' · Decoration':''}${b.advance&&b.advance!=='0'?' · Adv: ₹'+b.advance:''}</div>
+            <div class="list-extra">${esc(b.menuChoice)}${b.decoration?' · Decoration':''}${b.minBilling?' · Min bill ₹'+MIN_BILLING_TOTAL.toLocaleString('en-IN'):''}${b.advance&&b.advance!=='0'?' · Adv: ₹'+b.advance:''}</div>
           </div>
           <span class="badge ${b.isEnquiry||b.type.startsWith('Enquiry')?'badge-enquiry':b.type==='Private Area'?'badge-private':'badge-table'}">${b.type}</span>
           <div style="display:flex;gap:6px;flex-shrink:0">
@@ -618,7 +630,7 @@
     // ── BOOKING MODALS ──
     function openNewModal(date=todayStr()){
       state.modalMode='new'; state.editBookingId=null;
-      state.formData={date,type:'Table Booking',event:EVENT_TYPES[0],menuChoice:'A-la-carte',menuNote:'',decoration:false,fromTime:'',toTime:'',guests:'',advance:'',phone:'',notes:'',name:''};
+      state.formData={date,type:'Table Booking',event:EVENT_TYPES[0],menuChoice:'A-la-carte',menuNote:'',decoration:false,minBilling:false,fromTime:'',toTime:'',guests:'',advance:'',phone:'',notes:'',name:''};
       renderBookingModal();
     }
     function openEditModal(id){
@@ -636,10 +648,12 @@
       const {modalMode:mode,formData:f,userRole}=state;
       const isView=mode==='view', isNew=mode==='new', dis=isView?'disabled':'';
       const conflict=!isView&&checkConflict(f,isNew?null:state.editBookingId);
-      const mc=f.menuChoice||'A-la-carte', dec=!!f.decoration;
+      const enqConflict=!isView&&!!f.isEnquiry&&checkEnquiryConflict(f,isNew?null:state.editBookingId);
+      const mc=f.menuChoice||'A-la-carte', dec=!!f.decoration, minBill=!!f.minBilling;
       document.getElementById('modal-title').textContent={new:'New booking',edit:'Edit booking',view:'Booking details'}[mode];
       document.getElementById('modal-body').innerHTML=`
         ${conflict?`<div class="conflict-warn">&#9888; Private Area already booked for an overlapping time on this date.</div>`:''}
+        ${enqConflict?`<div class="conflict-warn">&#9888; Another enquiry already exists for this time slot — check with the other guest first.</div>`:''}
         <div class="sec">Guest info</div>
         <div class="field-row">
           <div><label class="fl">Guest name *</label><input id="f-name" value="${esc(f.name||'')}" placeholder="Full name" ${dis}></div>
@@ -684,6 +698,16 @@
           <button type="button" class="toggle-btn ${dec?'on-yes':''}" id="dec-yes" ${dis}>Yes</button>
           <button type="button" class="toggle-btn ${!dec?'on-no':''}" id="dec-no" ${dis}>No</button>
         </div>
+        <div class="sec">Minimum billing</div>
+        <label style="display:flex;align-items:flex-start;gap:9px;cursor:${isView?'default':'pointer'};margin-bottom:6px">
+          <input type="checkbox" id="f-minbilling" ${minBill?'checked':''} ${dis} style="width:18px;height:18px;flex-shrink:0;margin-top:1px;accent-color:var(--coral);cursor:inherit">
+          <span style="font-size:13px;color:var(--gray-800);line-height:1.4">
+            <strong>Minimum billing applies</strong><br>
+            <span style="font-size:12px;color:var(--gray-600)">${minBill
+              ? `Guest commits to a minimum billing of ₹${MIN_BILLING_BASE.toLocaleString('en-IN')} + 5% GST = <strong>₹${MIN_BILLING_TOTAL.toLocaleString('en-IN')}</strong>.`
+              : `No minimum billing commitment. Tick the box to apply ₹${MIN_BILLING_BASE.toLocaleString('en-IN')} + 5% GST = ₹${MIN_BILLING_TOTAL.toLocaleString('en-IN')}.`}</span>
+          </span>
+        </label>
         <div class="sec">Additional notes</div>
         <div class="field-row single">
           <textarea id="f-notes" rows="6" style="min-height:120px;resize:vertical" placeholder="Special requests, seating, equipment…" ${dis}>${esc(f.notes||'')}</textarea>
@@ -702,6 +726,7 @@
         document.getElementById('menu-fixed')?.addEventListener('click',()=>{ syncForm(); state.formData.menuChoice='Fixed'; renderBookingModal(); });
         document.getElementById('dec-yes')?.addEventListener('click',()=>{ syncForm(); state.formData.decoration=true; renderBookingModal(); });
         document.getElementById('dec-no')?.addEventListener('click',()=>{ syncForm(); state.formData.decoration=false; renderBookingModal(); });
+        document.getElementById('f-minbilling')?.addEventListener('change',e=>{ syncForm(); state.formData.minBilling=e.target.checked; renderBookingModal(); });
         document.getElementById('enq-yes')?.addEventListener('click',()=>{ syncForm(); state.formData.isEnquiry=true; renderBookingModal(); });
         document.getElementById('enq-no')?.addEventListener('click',()=>{ syncForm(); state.formData.isEnquiry=false; renderBookingModal(); });
         document.getElementById('m-save')?.addEventListener('click',saveBooking);
@@ -717,7 +742,8 @@
 
     function syncForm(){
       const gv=id=>{ const el=document.getElementById(id); return el?el.value.trim():''; };
-      state.formData={...state.formData,name:gv('f-name'),phone:gv('f-phone'),type:gv('f-type'),date:gv('f-date'),fromTime:gv('f-from'),toTime:gv('f-to'),guests:gv('f-guests'),event:gv('f-event'),advance:gv('f-advance'),menuNote:gv('f-menunote'),notes:gv('f-notes')};
+      const mb=document.getElementById('f-minbilling');
+      state.formData={...state.formData,name:gv('f-name'),phone:gv('f-phone'),type:gv('f-type'),date:gv('f-date'),fromTime:gv('f-from'),toTime:gv('f-to'),guests:gv('f-guests'),event:gv('f-event'),advance:gv('f-advance'),menuNote:gv('f-menunote'),notes:gv('f-notes'),minBilling:mb?mb.checked:!!state.formData.minBilling};
     }
 
     function closeModal(){ document.getElementById('modal-overlay').style.display='none'; state.modalMode=null; state.formData={}; }
@@ -733,12 +759,15 @@
       if(!f.guests){alert('Number of guests is required');return;}
       if(f.fromTime>=f.toTime){alert('To time must be after From time');return;}
       if(f.type==='Private Area'&&checkConflict(f,state.modalMode==='new'?null:state.editBookingId)){alert('Private Area is already booked for this time. Please choose a different slot.');return;}
+      if(f.isEnquiry&&checkEnquiryConflict(f,state.modalMode==='new'?null:state.editBookingId)){
+        if(!confirm('Another enquiry already exists for this time slot. Please check with the other guest first before proceeding.\n\nDo you still want to save this enquiry?')) return;
+      }
       const btn=document.getElementById('m-save');
       btn.innerHTML='<span class="spinner"></span>Saving…'; btn.disabled=true;
       const data={name:f.name,phone:f.phone||'',
         type: f.isEnquiry ? `Enquiry - ${f.type}` : f.type,
         isEnquiry: !!f.isEnquiry,
-        date:f.date,fromTime:f.fromTime,toTime:f.toTime,guests:parseInt(f.guests)||1,event:f.event,advance:f.advance||'0',menuChoice:f.menuChoice,menuNote:f.menuNote||'',decoration:!!f.decoration,notes:f.notes||'',updatedAt:new Date().toISOString(),updatedBy:state.user.email};
+        date:f.date,fromTime:f.fromTime,toTime:f.toTime,guests:parseInt(f.guests)||1,event:f.event,advance:f.advance||'0',menuChoice:f.menuChoice,menuNote:f.menuNote||'',decoration:!!f.decoration,minBilling:!!f.minBilling,notes:f.notes||'',updatedAt:new Date().toISOString(),updatedBy:state.user.email};
       try{
         if(state.modalMode==='new'){data.createdAt=new Date().toISOString();data.createdBy=state.user.email;await addDoc(collection(db,'bookings'),data);showToast('Booking created!');}
         else{await updateDoc(doc(db,'bookings',state.editBookingId),data);showToast('Booking updated!');}
@@ -773,6 +802,7 @@
         `📍 *Booking type:* ${b.type}`,
         `🍽️ *Menu:* ${b.menuChoice}${b.menuChoice==='Fixed'&&b.menuNote?'\n    '+b.menuNote:''}`,
         `💐 *Decoration:* ${b.decoration?'Yes':'No'}`,
+        b.minBilling ? `🧾 *Minimum billing:* ₹${MIN_BILLING_BASE.toLocaleString('en-IN')} + 5% GST = ₹${MIN_BILLING_TOTAL.toLocaleString('en-IN')}` : null,
         b.advance&&b.advance!=='0' ? `💰 *Advance received:* ₹${b.advance}` : null,
         b.notes ? `📝 *Notes:* ${b.notes}` : null,
         ``,
